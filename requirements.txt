@@ -1,0 +1,4 @@
+# Abhängigkeiten hier eintragen
+anthropic
+jupyter
+python-dotenv
