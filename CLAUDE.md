@@ -23,4 +23,4 @@ Claude API Lernprojekt — Experimente mit Anthropic SDK (Chatbots, Notebooks, S
 
 ## Hinweise
 - Nur `generate_questions.py` ruft `load_dotenv()` auf — bei den anderen Skripten muss `ANTHROPIC_API_KEY` bereits in der Shell gesetzt sein (z.B. via `export ANTHROPIC_API_KEY=...` oder `.env` manuell sourcen)
-- CLAUDE.md selbst noch committen: `git add CLAUDE.md && git commit -m "Add CLAUDE.md"`
+- Nach freshly Clone: `git remote set-head origin main` ausführen (wird von `/security-review` und ähnlichen Skills benötigt)
