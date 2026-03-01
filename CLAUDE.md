@@ -24,3 +24,17 @@ Claude API Lernprojekt — Experimente mit Anthropic SDK (Chatbots, Notebooks, S
 ## Hinweise
 - Nur `generate_questions.py` ruft `load_dotenv()` auf — bei den anderen Skripten muss `ANTHROPIC_API_KEY` bereits in der Shell gesetzt sein (z.B. via `export ANTHROPIC_API_KEY=...` oder `.env` manuell sourcen)
 - Nach freshly Clone: `git remote set-head origin main` ausführen (wird von `/security-review` und ähnlichen Skills benötigt)
+
+## MCP-Server (verfügbar)
+
+| Name | URL / Command | Zweck |
+|------|---------------|-------|
+| n8n | `https://n8n.novachris.de/mcp-server/http` | Automation, Telegram, PDF |
+| filesystem | `@modelcontextprotocol/server-filesystem` | Lokale Dateien |
+| memory | `@modelcontextprotocol/server-memory` | Session-Persistenz |
+
+Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-manager/SKILL.md`
+
+## Bekannte Einschränkungen (Claude Code)
+- Langer Paste-Text erscheint als `[Pasted text #N +M lines]` — Inhalt kommt nicht bei Claude an
+  → Workaround: Text in Datei speichern und mit `@/pfad/zur/datei.md` referenzieren
