@@ -29,10 +29,25 @@ services:
           create_host_path: true
           propagation: rprivate
 
-      # ✅ ERLAUBT: Relativer Bind-Mount, read-only — Config unveränderlich
+      # ✅ ERLAUBT: Konfiguration — unveränderlich (Immutable Config)
+      # read_only: true → Container kann keine Config-Datei überschreiben
+      # rprivate → keine Host-Mount-Propagation nach Container-Start
+      # Schutz: verhindert Configuration Drift und Config-Tampering durch kompromittierten Prozess
       - type: bind
         source: ./config
         target: /app/config
+        read_only: true
+        bind:
+          propagation: rprivate
+
+      # ✅ ERLAUBT: Secrets — read-only, unter /run/secrets (OCI-Standard-Pfad)
+      # /run/secrets ist der standardisierte Pfad für Container-Secrets (Docker Swarm / OCI)
+      # read_only: true → kein Schreiben, kein Überschreiben durch Container-Prozess
+      # rprivate → Secret-Mounts propagieren nicht auf Sub-Mounts
+      # Schutz: Secret-Leakage über manipulierte Config-Writes verhindert
+      - type: bind
+        source: ./secrets
+        target: /run/secrets
         read_only: true
         bind:
           propagation: rprivate

@@ -143,6 +143,61 @@ Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-man
 
 ---
 
+## Docker-Sicherheit: Immutable Configuration Infrastructure
+
+### Bedrohung
+Configuration Drift und Configuration Tampering — ein kompromittierter Container-Prozess
+überschreibt seine eigene Konfiguration oder Secrets, um Verhalten dauerhaft zu verändern
+oder Anmeldedaten zu exfiltrieren.
+
+### Schutz-Mechanismus: Read-Only Mounts für Config und Secrets
+
+```yaml
+volumes:
+  # Konfiguration: unveränderlich
+  - type: bind
+    source: ./config
+    target: /app/config
+    read_only: true
+    bind:
+      propagation: rprivate
+
+  # Secrets: read-only, OCI-Standard-Pfad /run/secrets
+  - type: bind
+    source: ./secrets
+    target: /run/secrets
+    read_only: true
+    bind:
+      propagation: rprivate
+```
+
+**Warum `/run/secrets`?**
+`/run/secrets` ist der OCI-standardisierte Pfad für Container-Secrets (Docker Swarm,
+Kubernetes Secrets als File-Mounts). Tools und Bibliotheken erwarten Secrets dort —
+kein `./secrets` als App-Argument nötig.
+
+**Schutzwirkung:**
+
+| Angriff | Ohne Schutz | Mit `read_only: true` |
+|---|---|---|
+| Config-Datei überschreiben | möglich | `EROFS: read-only file system` |
+| Secret-Datei via Write exfiltrieren | möglich | kein Schreibzugriff |
+| Configuration Drift durch Prozess | schleichend | unmöglich |
+| Tamper nach Kompromittierung | persistent | Neustart stellt Zustand wieder her |
+
+**Zusammenspiel `read_only` + `rprivate`:**
+- `read_only: true` → Kernel blockiert alle Schreibsyscalls auf diesem Mount
+- `propagation: rprivate` → neue Host-Mounts propagieren nicht in den Container,
+  verhindert nachträgliches "Unter-Mounten" eines beschreibbaren Overlays
+
+### Wichtige Regel für AI-Assistenten
+- `./config` und `./secrets` **immer** mit `read_only: true` mounten
+- Secrets **niemals** in `/app/...` mounten — ausschließlich `/run/secrets`
+- **Niemals** Secrets in Umgebungsvariablen (`environment:`) übergeben — nur File-Mounts
+- `read_only: false` niemals setzen, auch nicht temporär für Debugging
+
+---
+
 ## Docker-Sicherheit: Volume Mount Type Classification
 
 ### Bedrohung
