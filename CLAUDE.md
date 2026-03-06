@@ -143,6 +143,49 @@ Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-man
 
 ---
 
+## Docker-Sicherheit: Filesystem & Storage Security (Gebot 4)
+
+### Bedrohung
+Directory Traversal (`../../etc/passwd`) und Symlink-Attacks können aus einem Container
+heraus auf Host-Dateisystempfade zeigen, die außerhalb des erlaubten Scopes liegen.
+
+### Schutz-Mechanismus: `safe-container-exec.sh`
+
+Wrapper-Skript für alle Container-Befehle — ersetzt direktes `docker compose exec`:
+
+```bash
+# Statt:
+docker compose exec app sh -c "cat ../../etc/shadow"   # ❌ unsicher
+
+# Immer:
+AGENT_NAMESPACE=CLAUDE bash safe-container-exec.sh pjc001 "cat /app/data/output.json"  # ✅
+```
+
+**Vier Schutzschichten:**
+
+| Schicht | Prüfung | Beispiel blockiert |
+|---|---|---|
+| Command Whitelist | Nur Lese-Befehle erlaubt (`find`, `ls`, `cat`, `grep`, `awk`, `sed`, `tail`, `head`) | `rm`, `chmod`, `curl`, `bash` |
+| Traversal-Block | Regex-Prüfung auf `..` im gesamten Befehlsstring | `cat ../../etc/passwd` |
+| Absoluter Pfad außerhalb `/app` | Blockiert Zugriff auf `/etc`, `/root`, `/proc` | `cat /etc/shadow` |
+| `chroot`-Semantik via `-w` | `docker compose exec -w /app` + explizites `cd /app` | Symlink-Target außerhalb Workdir |
+
+**Verwendung:**
+
+```bash
+# Lesen
+AGENT_NAMESPACE=CLAUDE bash safe-container-exec.sh pjc001 "ls -la /app/data"
+AGENT_NAMESPACE=CLAUDE bash safe-container-exec.sh pjc001 "cat /app/data/result.json"
+AGENT_NAMESPACE=CLAUDE bash safe-container-exec.sh pjc001 "grep ERROR /app/data/app.log"
+```
+
+### Wichtige Regel für AI-Assistenten
+- **Niemals** `docker compose exec` ohne `safe-container-exec.sh` aufrufen
+- Kein `..` in Pfadargumenten — immer absolute Pfade unter `/app` verwenden
+- Neue Befehle nur nach expliziter Erweiterung der `ALLOWED_COMMANDS`-Whitelist nutzen
+
+---
+
 ## Docker-Sicherheit: UID-Namespace-Isolation
 
 ### Bedrohung
