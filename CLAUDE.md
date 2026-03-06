@@ -143,6 +143,54 @@ Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-man
 
 ---
 
+## Docker-Sicherheit: UID-Namespace-Isolation
+
+### Bedrohung
+Container-Root (UID 0) kann bei einem Container-Escape direkt auf das Host-Dateisystem
+zugreifen. Ohne UID-Mapping hat jeder Container-Prozess effektiv root-Rechte auf dem Host.
+
+### Schutz-Mechanismus: Non-Root User Mapping
+
+**Host-Setup** (einmalig als root, `setup-agent-isolation.sh`):
+
+```bash
+sudo bash setup-agent-isolation.sh
+```
+
+Erstellt dedizierte System-User ohne Login-Shell:
+
+| Agent | UID:GID | Verzeichnis | Rechte |
+|---|---|---|---|
+| CLAUDE | 1001:1001 | `/srv/agents/CLAUDE` | `700` (kein Cross-Access) |
+| GRAVITY | 1002:1002 | `/srv/agents/GRAVITY` | `700` |
+| NEXUS | 1003:1003 | `/srv/agents/NEXUS` | `700` |
+
+**Container-Konfiguration** (`docker-compose.yml`):
+
+```yaml
+user: "${AGENT_UID}:${AGENT_GID}"   # Nie root
+security_opt:
+  - no-new-privileges:true          # Kein setuid/setgid-Escalation
+volumes:
+  - ./config:/app/config:ro         # Config immer read-only
+```
+
+**Wie es zusammenwirkt:**
+
+| Schicht | Mechanismus | Schutz |
+|---|---|---|
+| User-Mapping | Container läuft als UID 1001–1003 | Kein root auf dem Host |
+| `chmod 700` | Verzeichnis nur für eigene UID lesbar | Kein Cross-Agent-Zugriff |
+| `no-new-privileges` | Blockiert Privilege Escalation via setuid | Kein nachträglicher root-Gain |
+| Config `read_only` | Volume-Mount schreibgeschützt | Container kann Config nicht manipulieren |
+
+### Wichtige Regel für AI-Assistenten
+- **Niemals** `user: root` oder `user: "0:0"` in `docker-compose.yml` setzen
+- UID-Zuweisungen sind **fest** — zwei Agenten dürfen niemals die gleiche UID teilen
+- `setup-agent-isolation.sh` nur als root auf dem Docker-Host ausführen, nicht im Container
+
+---
+
 ## Docker-Sicherheit: Cross-Project Contamination
 
 ### Bedrohung

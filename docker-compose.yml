@@ -1,0 +1,43 @@
+# docker-compose.yml — Template für namespace-isolierte Agenten-Container
+#
+# Verwendung:
+#   AGENT_NAMESPACE=CLAUDE AGENT_UID=1001 AGENT_GID=1001 \
+#     SERVICE_IMAGE=myimage:latest make up
+#
+# UID-Mapping (fest, nie überschneiden):
+#   CLAUDE:  1001:1001
+#   GRAVITY: 1002:1002
+#   NEXUS:   1003:1003
+
+services:
+  app:
+    image: ${SERVICE_IMAGE}
+
+    # Non-Root User Mapping:
+    # Container läuft als Agent-spezifischer System-User, nicht als root.
+    # Selbst bei Container-Escape hat der Prozess nur UID/GID des Agents
+    # auf dem Host — kein Zugriff auf Dateien anderer Agents oder root.
+    user: "${AGENT_UID}:${AGENT_GID}"
+
+    volumes:
+      # Schreibbares Daten-Verzeichnis (gehört AGENT_UID:AGENT_GID)
+      - type: bind
+        source: ./data
+        target: /app/data
+        bind:
+          create_host_path: true
+
+      # Konfiguration: read-only — Container kann Config nicht verändern
+      - type: bind
+        source: ./config
+        target: /app/config
+        read_only: true
+
+    security_opt:
+      # Verhindert Privilege Escalation via setuid/setgid-Binaries im Container
+      - no-new-privileges:true
+
+    labels:
+      - "agent.namespace=${AGENT_NAMESPACE}"
+      - "project.name=${COMPOSE_PROJECT_NAME}"
+      - "agent.uid=${AGENT_UID}"
