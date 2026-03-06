@@ -20,18 +20,42 @@ services:
     user: "${AGENT_UID}:${AGENT_GID}"
 
     volumes:
-      # Schreibbares Daten-Verzeichnis (gehört AGENT_UID:AGENT_GID)
+      # ✅ ERLAUBT: Relativer Bind-Mount — nur Projektverzeichnis, nie absolut
+      # rprivate verhindert, dass Host-Mounts in den Container propagieren
       - type: bind
         source: ./data
         target: /app/data
         bind:
           create_host_path: true
+          propagation: rprivate
 
-      # Konfiguration: read-only — Container kann Config nicht verändern
+      # ✅ ERLAUBT: Relativer Bind-Mount, read-only — Config unveränderlich
       - type: bind
         source: ./config
         target: /app/config
         read_only: true
+        bind:
+          propagation: rprivate
+
+      # ✅ ERLAUBT: Named Volume mit vollständigem Namespace-Präfix
+      # Verhindert Volume-Kollisionen zwischen Agenten
+      - type: volume
+        source: app-cache
+        target: /app/cache
+
+      # ✅ ERLAUBT: Ephemeres tmpfs für temporäre Dateien
+      # Kein Persistenz, kein Host-Dateisystemzugriff
+      - type: tmpfs
+        target: /app/tmp
+        tmpfs:
+          size: 500M
+          mode: 1777
+
+      # ❌ VERBOTEN — niemals diese Mount-Typen verwenden:
+      # - /etc:/app/config              # Absoluter Host-Pfad: kritische Systemdaten
+      # - /var/run/docker.sock:/sock    # Docker Socket: vollständige Host-Kontrolle
+      # - /:/host                       # Root-Filesystem-Mount
+      # - ../other-agent:/shared        # Cross-Agent-Pfad via Traversal
 
     security_opt:
       # Verhindert Privilege Escalation via setuid/setgid-Binaries im Container
@@ -41,3 +65,10 @@ services:
       - "agent.namespace=${AGENT_NAMESPACE}"
       - "project.name=${COMPOSE_PROJECT_NAME}"
       - "agent.uid=${AGENT_UID}"
+
+# Named Volumes: vollständiger Namespace-Präfix verhindert Kollisionen
+# Format: <AGENT_NAMESPACE>-<COMPOSE_PROJECT_NAME>-vol-<zweck>
+volumes:
+  app-cache:
+    name: "${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-vol-cache"
+    driver: local

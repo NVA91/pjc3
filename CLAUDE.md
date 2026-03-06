@@ -143,6 +143,58 @@ Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-man
 
 ---
 
+## Docker-Sicherheit: Volume Mount Type Classification
+
+### Bedrohung
+Arbitrary Host Path Injection — absolute Host-Pfade in Volume-Mounts gewähren Containern
+Zugriff auf kritische Systemverzeichnisse (`/etc`, `/root`) oder volle Host-Kontrolle
+via Docker Socket (`/var/run/docker.sock`).
+
+### Strikte Volume-Policy (`docker-compose.yml`)
+
+**Erlaubte Mount-Typen:**
+
+| Typ | Beispiel | Zweck | Besonderheit |
+|---|---|---|---|
+| Relativer Bind-Mount | `source: ./data` | Projektdaten (rw) | `propagation: rprivate` verhindert Host-Mount-Propagation |
+| Relativer Bind-Mount (ro) | `source: ./config` | Konfiguration | `read_only: true` + `rprivate` |
+| Named Volume | `source: app-cache` | Cache/Persistenz | Name = `<NS>-<PROJECT>-vol-<zweck>` |
+| tmpfs | `target: /app/tmp` | Temp-Dateien | Kein Persistenz, kein Host-Zugriff, `size: 500M` |
+
+**Verbotene Mount-Typen — niemals verwenden:**
+
+```yaml
+# ❌ Absoluter Host-Pfad → kritische Systemdaten exponiert
+- /etc:/app/config
+
+# ❌ Docker Socket → vollständige Host-Kontrolle (Container-Escape trivial)
+- /var/run/docker.sock:/sock
+
+# ❌ Root-Filesystem
+- /:/host
+
+# ❌ Cross-Agent-Traversal → Isolation gebrochen
+- ../other-agent:/shared
+```
+
+**Named Volume Naming Convention:**
+```
+<AGENT_NAMESPACE>-<COMPOSE_PROJECT_NAME>-vol-<zweck>
+Beispiel: CLAUDE-pjc001-vol-cache
+```
+
+**`propagation: rprivate` erklärt:**
+Verhindert, dass neue Host-Mounts, die nach Container-Start entstehen, in den
+Container propagieren (Recursive Private = kein Mount-Leaking in beide Richtungen).
+
+### Wichtige Regel für AI-Assistenten
+- **Niemals** absolute Pfade als `source` in Volume-Mounts — ausschließlich `./relative/pfade`
+- **Niemals** `/var/run/docker.sock` mounten
+- Named Volumes immer mit vollständigem `${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-vol-*` benennen
+- Alle Bind-Mounts erhalten `propagation: rprivate`
+
+---
+
 ## Docker-Sicherheit: Filesystem & Storage Security (Gebot 4)
 
 ### Bedrohung
