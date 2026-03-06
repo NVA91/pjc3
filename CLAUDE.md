@@ -143,6 +143,49 @@ Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-man
 
 ---
 
+## Docker-Sicherheit: Cross-Project Contamination
+
+### Bedrohung
+`docker compose down` **ohne** `-p`-Flag terminiert alle Container **aller** Agenten auf dem Host —
+nicht nur die des aktuellen Projekts. In Multi-Agenten-Umgebungen kann ein einzelner Fehler
+den Betrieb anderer Projekte zerstören.
+
+### Schutz-Mechanismus: `Makefile`
+Das `Makefile` erzwingt namespace-isolierte Docker-Operationen:
+
+```bash
+# Immer mit explizitem AGENT_NAMESPACE starten
+AGENT_NAMESPACE=myagent make up
+AGENT_NAMESPACE=myagent make down   # Fragt zur Bestätigung
+AGENT_NAMESPACE=myagent make ps
+AGENT_NAMESPACE=myagent make logs
+```
+
+**Wie es funktioniert:**
+
+| Mechanismus | Beschreibung |
+|---|---|
+| `AGENT_NAMESPACE` Pflichtfeld | `make` bricht ab, wenn Variable nicht gesetzt ist (`$(error ...)`) |
+| `COMPOSE_PROJ` Präfix | Jeder Docker-Aufruf nutzt `-p $(AGENT_NS)-pjc$(PROJ_ID)` — kein globaler Default |
+| `down` mit Bestätigung | Interaktiver `read`-Prompt verhindert versehentliches Ausführen |
+| Audit-Logging | Jede Operation wird nach `/var/log/docker-projects/$(AGENT_NS)/audit.log` geschrieben |
+| `logs` JSON-annotiert | Log-Zeilen werden via `jq` mit `agent` und `project` angereichert |
+
+### Fachbegriffe
+
+- **Compose Project Scope**: Logische Docker-Ressourcen-Gruppierung unter eindeutigem Präfix (`-p`-Flag).
+  Netzwerke, Volumes und Container sind nur innerhalb dieses Scopes sichtbar und werden nur von
+  Befehlen mit passendem `-p`-Flag betroffen.
+
+- **Blast Radius Containment**: Architekturprinzip, das Fehlerauswirkungen auf einen klar definierten
+  Scope begrenzt. Ein Fehler in Projekt `agentA-pjc001` kann Projekt `agentB-pjc002` nicht treffen.
+
+### Wichtige Regel für AI-Assistenten
+**Niemals** `docker compose down`, `docker compose stop` oder `docker compose rm` ohne `-p`-Flag
+in diesem Repository ausführen. Immer das `Makefile` nutzen oder explizit `-p <compose-project>` angeben.
+
+---
+
 ## Bekannte Einschränkungen (Claude Code)
 
 - Langer Paste-Text erscheint als `[Pasted text #N +M lines]` — Inhalt kommt nicht bei Claude an
