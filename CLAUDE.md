@@ -24,6 +24,10 @@ pjc3/
 ├── nova_claude.py             # Streaming-Chatbot mit farbiger Ausgabe
 ├── chatbot.py                 # Einfacher Multi-Turn-Chatbot (kein Streaming)
 ├── generate_questions.py      # Fragengenerator mit stop_sequences + dotenv
+├── docker-compose.yml         # Container-Konfiguration mit Sicherheits-Policies
+├── Makefile                   # Namespace-isolierte Docker-Operationen (AGENT_NAMESPACE)
+├── safe-container-exec.sh     # Wrapper gegen Directory Traversal in Containern
+├── setup-agent-isolation.sh   # Einmalig als root: erstellt UID-isolierte Agent-User
 ├── requirements.txt           # Python-Abhängigkeiten
 ├── .gitignore                 # venv/, .env, __pycache__, *.pyc ausgeschlossen
 └── CLAUDE.md                  # Diese Datei
