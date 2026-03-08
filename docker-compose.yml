@@ -1,0 +1,89 @@
+# docker-compose.yml — Template für namespace-isolierte Agenten-Container
+#
+# Verwendung:
+#   AGENT_NAMESPACE=CLAUDE AGENT_UID=1001 AGENT_GID=1001 \
+#     SERVICE_IMAGE=myimage:latest make up
+#
+# UID-Mapping (fest, nie überschneiden):
+#   CLAUDE:  1001:1001
+#   GRAVITY: 1002:1002
+#   NEXUS:   1003:1003
+
+services:
+  app:
+    image: ${SERVICE_IMAGE}
+
+    # Non-Root User Mapping:
+    # Container läuft als Agent-spezifischer System-User, nicht als root.
+    # Selbst bei Container-Escape hat der Prozess nur UID/GID des Agents
+    # auf dem Host — kein Zugriff auf Dateien anderer Agents oder root.
+    user: "${AGENT_UID}:${AGENT_GID}"
+
+    volumes:
+      # ✅ ERLAUBT: Relativer Bind-Mount — nur Projektverzeichnis, nie absolut
+      # rprivate verhindert, dass Host-Mounts in den Container propagieren
+      - type: bind
+        source: ./data
+        target: /app/data
+        bind:
+          create_host_path: true
+          propagation: rprivate
+
+      # ✅ ERLAUBT: Konfiguration — unveränderlich (Immutable Config)
+      # read_only: true → Container kann keine Config-Datei überschreiben
+      # rprivate → keine Host-Mount-Propagation nach Container-Start
+      # Schutz: verhindert Configuration Drift und Config-Tampering durch kompromittierten Prozess
+      - type: bind
+        source: ./config
+        target: /app/config
+        read_only: true
+        bind:
+          propagation: rprivate
+
+      # ✅ ERLAUBT: Secrets — read-only, unter /run/secrets (OCI-Standard-Pfad)
+      # /run/secrets ist der standardisierte Pfad für Container-Secrets (Docker Swarm / OCI)
+      # read_only: true → kein Schreiben, kein Überschreiben durch Container-Prozess
+      # rprivate → Secret-Mounts propagieren nicht auf Sub-Mounts
+      # Schutz: Secret-Leakage über manipulierte Config-Writes verhindert
+      - type: bind
+        source: ./secrets
+        target: /run/secrets
+        read_only: true
+        bind:
+          propagation: rprivate
+
+      # ✅ ERLAUBT: Named Volume mit vollständigem Namespace-Präfix
+      # Verhindert Volume-Kollisionen zwischen Agenten
+      - type: volume
+        source: app-cache
+        target: /app/cache
+
+      # ✅ ERLAUBT: Ephemeres tmpfs für temporäre Dateien
+      # Kein Persistenz, kein Host-Dateisystemzugriff
+      - type: tmpfs
+        target: /app/tmp
+        tmpfs:
+          size: 500M
+          mode: 1777
+
+      # ❌ VERBOTEN — niemals diese Mount-Typen verwenden:
+      # - /etc:/app/config              # Absoluter Host-Pfad: kritische Systemdaten
+      # - /var/run/docker.sock:/sock    # Docker Socket: vollständige Host-Kontrolle
+      # - /:/host                       # Root-Filesystem-Mount
+      # - ../other-agent:/shared        # Cross-Agent-Pfad via Traversal
+
+    security_opt:
+      # Verhindert Privilege Escalation via setuid/setgid-Binaries im Container
+      - no-new-privileges:true
+
+    labels:
+      - "agent.namespace=${AGENT_NAMESPACE}"
+      - "project.name=${COMPOSE_PROJECT_NAME}"
+      - "agent.uid=${AGENT_UID}"
+
+# Named Volumes: vollständiger Namespace-Präfix verhindert Kollisionen
+# Format: <AGENT_NAMESPACE>-<COMPOSE_PROJECT_NAME>-vol-<zweck>
+volumes:
+  app-cache:
+    name: "${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-vol-cache"
+    driver: local
