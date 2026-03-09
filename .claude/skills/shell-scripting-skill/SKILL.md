@@ -7,39 +7,53 @@
 name: shell-scripting-skill
 description: >
   Sichere, strukturierte und wiederholbare Shell-Skripte sowie Office-Automatisierung:
-  ETL-Pipelines (CSV/Polars/Pandas), Excel-Tabellen (.xlsx), CSS und visuelle
-  Aufbereitung. Keine Dateien oder Pfade werden ohne ausdrückliche Nutzerfreigabe
-  geöffnet oder verändert.
+  ETL-Pipelines (CSV/Polars/Pandas), Excel-Finanzmodelle (.xlsx) mit Formelinjektion,
+  Data Warehousing, CSS und visuelle Aufbereitung. Keine Dateien oder Pfade werden
+  ohne ausdrückliche Nutzerfreigabe geöffnet oder verändert.
 
 categories:
   - name: Office-Arbeit
-    description: Datenadministration, ETL-Pipelines, Analyse und Visualisierung
+    description: >
+      Datenadministration, ETL-Pipelines, Data Warehousing,
+      Excel-Finanzmodellierung, Analyse und Visualisierung
   - name: Shell-Scripting
     description: Sichere, wiederholbare Bash/Zsh-Automatisierungen
   - name: Datenformate
     description: CSV, Excel (.xlsx), CSS
 
 triggers:
-  # Office-Arbeit / ETL
+  # Office-Arbeit / ETL / Data Warehousing
   - ETL-Pipeline aufbauen oder automatisieren (Extract, Transform, Load)
   - CSV-Dateien scannen, bereinigen, normalisieren oder konsolidieren
   - Polars oder Pandas für Datentransformation einsetzen
   - Schema einer CSV-Datei inspizieren oder Datentypen prüfen
-  - Daten deduplizieren oder Datumsformate normalisieren
+  - Daten deduplizieren, Datumsformate oder Telefonnummern normalisieren
   - Mehrere CSV-Dateien zusammenführen (concat/merge)
   - SQL-ähnliche Abfragen auf flachen Dateien ausführen
   - Daten-Einlagerung in strukturierte Formate automatisieren
+  - Fehlende Werte identifizieren und musterbasiert auffüllen
+  - Daten für relationale Datenbank-Skills aufbereiten
+  # Excel-Automatisierung / Finanzmodellierung
+  - Excel-Finanzmodell erstellen (Income Statement, Balance Sheet, Cash Flow)
+  - SaaS-Metriken modellieren (ARR, Churn, LTV, MRR)
+  - Szenario-Analyse erstellen (Base / Bull / Bear Case)
+  - Excel-Formeln injizieren statt Hardcoded Values eintragen
+  - Pivot-Tabellen sortieren, filtern oder Schema ändern
+  - Bedingte Formatierung oder Datenbalken in Excel anwenden
+  - Finanzmodellierungs-Konventionen anwenden (blaue/schwarze Schrift)
+  - Zirkelbezüge (#REF!, #VALUE!) in Excel debuggen und korrigieren
+  - Excel-Datei mit LibreOffice headless verifizieren
   # Shell-Scripting
   - Shell-Skripte erstellen, prüfen oder überarbeiten
   - Bash- oder Zsh-Automatisierungen entwickeln
   # Weitere Datenformate
-  - Excel-Tabellen (.xlsx) für Aufgabenverwaltung erstellen oder pflegen
   - CSS-Dateien strukturieren, benennen (BEM) oder stylen
   - Komplexe Inhalte in Tabellen- oder Baumstruktur aufbereiten
   - Expliziter Aufruf via /shell-scripting-skill
 
 resources:
   - resources/csv_etl_pipeline.py
+  - resources/excel_finanzmodell.py
   - resources/shell_template.sh
   - resources/csv_verarbeitung.py
   - resources/excel_aufgaben.py
@@ -115,6 +129,77 @@ Aufgabe erfordert Dateisystem-Zugriff (Verzeichnis scannen, Schema lesen)?
 | **Standard** | **Bevorzugen** | Nur bei Ecosystem-Zwang |
 
 Ressource für alle 4 Phasen: `resources/csv_etl_pipeline.py` (Ladestufe 3)
+
+### Data Warehousing — Erweiterter Scope
+
+Die ETL-Pipeline bildet die Grundlage für autonomes Data Warehousing. Zusätzlich zu den 4 Phasen:
+
+| Aufgabe | Methode | Übergabe an |
+|---|---|---|
+| Fehlende Werte identifizieren | Musterbasiert: Median/Modus/Vorwärts-Fill je Dtype | Datenbank-Skill oder Excel-Modell |
+| Telefonnummern normalisieren | Regex → E.164-Format (`+49...`) | Relationale DB |
+| Firmennamen standardisieren | Strip + Title-Case + Alias-Mapping | Master-Data-Management |
+| Vollständigkeit prüfen | Pflichtfeld-Validierung vor Übergabe | Downstream-System |
+
+**Übergabe-Protokoll** (vor Weiterleitung an DB-Skill):
+- Ausgabe als JSON-Lines (eine Zeile = ein Datensatz) nach stdout
+- Fehler-Zeilen separat nach stderr mit Zeilennummer und Fehlertyp
+- Abschluss-Statistik: `{"ok": N, "fehler": M, "duplikate": K}`
+
+---
+
+## Excel-Automatisierung und finanzielle Modellierung
+
+Der xlsx-Skill kombiniert analytische Kraft (pandas) mit Formatierungspräzision (openpyxl),
+ohne die visuelle Integrität bestehender Unternehmensvorlagen zu zerstören.
+
+### Kerngrundsatz: Formelinjektion statt Hardcoded Values
+
+```
+FALSCH → Zelle B12 = 142857  (statisch, verliert Abhängigkeiten)
+RICHTIG → Zelle B12 = "=B5*B8*(1+B11)"  (dynamisch, Analyst kann B11 ändern)
+```
+
+Alle Finanzmodelle werden mit echten Excel-Formeln geschrieben. Aktualisiert ein Analyst
+eine Annahme (z. B. Wachstumsrate in B11), berechnet Excel das gesamte Modell neu.
+
+### Fähigkeiten-Übersicht
+
+| Bereich | Fähigkeiten | Ressource |
+|---|---|---|
+| **Institutionelle Finanzmodelle** | 3-Statement (IS/BS/CF), SaaS-Metriken (ARR/Churn/LTV), Szenario-Analyse (Base/Bull/Bear) | `excel_finanzmodell.py` |
+| **Datenaufbereitung & Pivot** | Importierte Daten sortieren/filtern, Pivot-Schema ändern, fehlende Werte füllen, Duplikate entfernen | `excel_finanzmodell.py` |
+| **Industriestandard-Formatierung** | Blaue Schrift = manuelle Eingabe, Schwarz = Formel, bedingte Formatierung, Datenbalken, Zahlenformate | `excel_finanzmodell.py` |
+| **Debugging & Verifikation** | Zirkelbezüge lokalisieren, #REF!/#VALUE! korrigieren, LibreOffice headless Formel-Check | `excel_finanzmodell.py` |
+
+### Farbcodierungs-Konvention (Finanzmodellierungs-Standard)
+
+| Schriftfarbe | Hex | Bedeutung | Wann setzen |
+|---|---|---|---|
+| Blau | `#0070C0` | Manuelle Eingabe / Annahme | Hardcoded input cells |
+| Schwarz | `#000000` | Berechnete Formel | Alle `=`-Zellen |
+| Grün | `#00B050` | Verknüpfung zu anderem Sheet | Cross-sheet references |
+| Rot | `#FF0000` | Fehler / Warnung | Negative Werte, Checks |
+
+### Ablauf für jedes Finanzmodell
+
+1. **Struktur bestätigen** — Welche Sheets? Welche Perioden (Monate/Jahre)?
+2. **Annahmen-Zellen definieren** — Blau färben, benennen (Named Ranges)
+3. **Formeln injizieren** — Niemals berechnete Werte hardcoden
+4. **Formatierung anwenden** — Zahlenformate, bedingte Formatierung
+5. **Verifizieren** — LibreOffice headless öffnen, Formel-Errors prüfen, stdout-Report
+
+### Debugging-Protokoll (#REF!, #VALUE!, Zirkelbezüge)
+
+```
+1. Fehlerzellen lokalisieren → ws.iter_rows() + cell.value.startswith("#") prüfen
+2. Ursache klassifizieren:
+   ├── #REF!  → gelöschte/verschobene Quellzelle → Formel neu aufbauen
+   ├── #VALUE! → falscher Datentyp in Formel → Typ-Cast oder Quellzelle prüfen
+   └── Zirkelbezug → Abhängigkeits-Graph traversieren → Iterative Calculation oder Formel umstrukturieren
+3. Korrektur dokumentieren → Kommentar in Zelle schreiben
+4. Re-Verifikation → LibreOffice erneut ausführen → 0 Errors bestätigen
+```
 
 ---
 
@@ -210,10 +295,11 @@ Für Prozesse: Nummerierte Schrittliste mit Entscheidungspunkten.
 
 | Ressource | Ladestufe | Kategorie | Inhalt |
 |---|---|---|---|
-| `resources/csv_etl_pipeline.py` | 3 | Office-Arbeit | Polars-ETL: Discovery, Schema, Bereinigung, Transformation |
+| `resources/csv_etl_pipeline.py` | 3 | Office-Arbeit | Polars-ETL: Discovery, Schema, Bereinigung, Transformation, Data Warehousing |
+| `resources/excel_finanzmodell.py` | 3 | Office-Arbeit | 3-Statement-Modell, SaaS-Metriken, Szenario-Analyse, Formelinjektion, Verifikation |
 | `resources/csv_verarbeitung.py` | 3 | Datenformate | CSV lesen/schreiben/filtern (Stdlib, einfache Ops) |
 | `resources/shell_template.sh` | 3 | Shell-Scripting | Vollständige sichere Bash-Vorlage |
-| `resources/excel_aufgaben.py` | 3 | Office-Arbeit | Excel-Aufgabentabelle mit Status-Farben |
+| `resources/excel_aufgaben.py` | 3 | Office-Arbeit | Excel-Aufgabentabelle mit Status-Farben (einfach) |
 | `resources/tabellen.css` | 3 | Datenformate | Tabellen-Grundstil + Status-Badges (BEM) |
 | `CLAUDE.md` → Docker-Sicherheit | — | — | Immutable Config, Volume Mounts, UID-Isolation |
 | `.claude/skills/n8n-workflow-manager/SKILL.md` | — | — | MCP vs. REST API Entscheidung |
