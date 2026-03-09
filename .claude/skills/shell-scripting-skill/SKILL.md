@@ -35,7 +35,9 @@ categories:
   - name: Datenbank
     description: >
       MCP-basierte Datenbankintegration: PostgreSQL-Schema-Exploration ohne Token-Overload,
-      SQLite als Agentic-Memory-Backend (langfristige Persistenz über Session-Grenzen hinweg),
+      Read-Only MCP-Konfiguration (DROP TABLE / DELETE via Protokoll blockiert),
+      Schreiboperationen ausschließlich als Flyway-Migrationsdateien (nie direkt ausführen),
+      SQLite als Agentic-Memory-Backend (Langzeitpersistenz über Session-Grenzen hinweg),
       lokaler HTTP-Server + Headless-Agent + SQLite-MCP-Server für Entitäten und Kontextbeziehungen
   - name: Shell-Scripting
     description: Sichere, wiederholbare Bash/Zsh-Automatisierungen
@@ -104,6 +106,12 @@ triggers:
   - Lokalen HTTP-Server zur Steuerung einer Headless-Agent-Session aufbauen
   - Entitäten und kontextuelle Beziehungen in SQLite-MCP-Server speichern
   - Historischen Kontext aus früheren Sessions abrufen und weiterverwenden
+  - MCP-Server auf Read-Only konfigurieren (DROP TABLE / DELETE verhindern)
+  - Schreiboperationen als SQL-Migrationsdatei generieren statt direkt ausführen
+  - Flyway/Liquibase-Migrationsskripte für Schema-Änderungen erzeugen
+  - SQL-Migration mit Rollback-Kommentar und Idempotenz-Pattern erstellen
+  - CI/CD-Pipeline für sichere Datenbankmigrationen einrichten (Staging → Prod)
+  - CREATE INDEX CONCURRENTLY ohne Table-Lock auf Produktionstabellen
   # Shell-Scripting
   - Shell-Skripte erstellen, prüfen oder überarbeiten
   - Bash- oder Zsh-Automatisierungen entwickeln
@@ -735,13 +743,158 @@ Session 2 (neue Session, leeres Context-Window):
   → Neue Erkenntnisse werden zurückgeschrieben
 ```
 
+### Datenbank-Sicherheit: Read-Only-Konfiguration und Schreiboperationen via CI/CD
+
+Sicherheitsaspekte spielen bei der Agenten-Datenbank-Interaktion eine übergeordnete Rolle.
+Der Architekturansatz setzt auf mehrere Schutzschichten, um destruktive Aktionen zu verhindern.
+
+#### Read-Only MCP-Konfiguration — Primärer Schutz
+
+MCP-Server für relationale Datenbanken werden **primär auf schreibgeschützte Abfragen** konfiguriert.
+Protokollbasierte und kryptografische Schranken verhindern unbeabsichtigte destruktive Aktionen:
+
+| Bedrohung | Ursache | MCP-Schutz |
+|---|---|---|
+| `DROP TABLE` | Halluzination oder Prompt-Injection | MCP-Server: `allowed_operations: [SELECT]` — DDL blockiert |
+| Unautorisiertes `DELETE` | Fehlerhafte WHERE-Klausel, falscher Kontext | DML-Whitelist: nur SELECT zugelassen |
+| Daten-Exfiltration | `SELECT * FROM users` ohne LIMIT | Result-Size-Limit im MCP-Server (z. B. `max_rows: 1000`) |
+| Credential-Leak | Connection-String im Prompt | MCP-Host verwaltet Credentials — Agent sieht sie nie |
+
+**MCP-Server-Konfiguration (postgres-mcp — Beispiel):**
+
+```json
+{
+  "allowed_operations": ["SELECT"],
+  "max_rows": 1000,
+  "schema_exploration": true,
+  "write_operations": false,
+  "ddl_operations": false
+}
+```
+
+**Protokollbasierte Schranken — wie sie wirken:**
+
+```
+Agent sendet: execute_query("DROP TABLE users")
+    ↓
+MCP-Server prüft: Operation-Typ = DDL (nicht in allowed_operations)
+    ↓
+MCP-Server antwortet: { "error": "Operation not permitted: DDL statements are disabled" }
+    ↓
+Agent erhält Fehler → kein Datenbankzugriff erfolgt
+    ↓
+Agent soll Nutzer informieren, nicht umgehen
+```
+
+> **Pflicht:** Der Agent darf niemals versuchen, MCP-Sicherheitsschranken zu umgehen
+> (z.B. durch SQL-Injection-Techniken gegen den MCP-Server selbst oder durch
+> Formulierung von DELETE als verschachtelte SELECT-Subqueries wo möglich).
+> Bei verweigertem Zugriff: Nutzer informieren, nicht eskalieren.
+
+#### Schreiboperationen via Migrationsdateien — Einziger erlaubter Write-Weg
+
+Sind Schreiboperationen (Schema-Migrationen, Daten-Korrekturen) zwingend notwendig,
+**generiert der Agent ausschließlich SQL-Code als Textdatei** — er führt ihn niemals direkt aus.
+
+```
+Agent                        Dateisystem                  CI/CD-Pipeline
+  │                               │                              │
+  │  SQL generieren               │                              │
+  ├──────────────────────────────►│                              │
+  │  migrations/V3__add_index.sql │                              │
+  │                               │                              │
+  │  Review anfordern             │                              │
+  ├──────────────────────────────►│ (Nutzer prüft Datei)         │
+  │                               │                              │
+  │                               │  git commit + push           │
+  │                               ├─────────────────────────────►│
+  │                               │                              │  Flyway/Liquibase
+  │                               │                              │  führt Migration aus
+  │                               │                              │  (Staging → Prod)
+```
+
+**Migrations-Datei-Namenskonvention (Flyway-Standard):**
+
+```
+migrations/
+├── V1__create_users_table.sql        # Erstellt Tabelle
+├── V2__add_email_index.sql           # Fügt Index hinzu
+├── V3__add_created_at_column.sql     # Fügt Spalte hinzu (nicht nullable mit DEFAULT)
+└── R__refresh_materialized_views.sql # Repeatable Migration (immer neu ausführen)
+```
+
+**Pflicht-Inhalte einer Migrations-Datei (Agent muss alle generieren):**
+
+```sql
+-- Migration: V3__add_created_at_column.sql
+-- Zweck:     Zeitstempel-Spalte für Audit-Trail in orders-Tabelle
+-- Autor:     Claude Code (generiert, nicht ausgeführt)
+-- Erstellt:  2026-03-09
+-- Review:    Pflichtfeld — vor CI/CD-Ausführung durch Entwickler prüfen
+--
+-- RÜCKGÄNGIG MACHEN:
+--   ALTER TABLE orders DROP COLUMN IF EXISTS created_at;
+
+BEGIN;
+
+-- Neue Spalte mit DEFAULT (verhindert NOT NULL Constraint-Fehler bei bestehenden Zeilen)
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+-- Index für Datumsbereichs-Abfragen
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_created_at
+  ON orders(created_at DESC);
+
+-- Verifikation (Agent zeigt Erwartungswert)
+-- ERWARTUNG: 0 Zeilen ohne created_at
+-- SELECT COUNT(*) FROM orders WHERE created_at IS NULL;
+
+COMMIT;
+```
+
+**Kritische Regeln für Migrations-SQL (Agent muss einhalten):**
+
+| Regel | SQL-Pattern | Grund |
+|---|---|---|
+| `ADD COLUMN IF NOT EXISTS` | `ALTER TABLE t ADD COLUMN IF NOT EXISTS c TYPE` | Idempotent — wiederholbar ohne Fehler |
+| `NOT NULL` immer mit `DEFAULT` | `NOT NULL DEFAULT 'wert'` | Bestehende Zeilen nicht blockieren |
+| `CREATE INDEX CONCURRENTLY` | `CREATE INDEX CONCURRENTLY IF NOT EXISTS` | Kein Table-Lock auf Produktionstabellen |
+| `BEGIN; ... COMMIT;` | Transaktion wrappen | Rollback bei Fehler automatisch |
+| Rollback-Kommentar pflicht | `-- RÜCKGÄNGIG MACHEN: DROP COLUMN ...` | Entwickler kennt Undo-Weg |
+| Nur eine Änderung pro Datei | 1 `ALTER TABLE` pro Migration | Atomare, nachvollziehbare Änderungen |
+
+#### Vollständiger Sicherheits-Entscheidungsbaum
+
+```
+Agent erhält Datenbankaufgabe
+    │
+    ├── Aufgabe = Daten lesen / analysieren?
+    │   → SELECT via MCP-Tool (Read-Only)
+    │   → LIMIT setzen → Ergebnis nach stdout
+    │
+    ├── Aufgabe = Schema inspizieren?
+    │   → list_tables → get_schema (iterativ, Tabelle für Tabelle)
+    │   → Kein Bulk-Import
+    │
+    ├── Aufgabe = Daten schreiben / Schema ändern?
+    │   → SQL-Migrationsdatei generieren (Flyway-Konvention)
+    │   → Nutzer zur Prüfung auffordern
+    │   → Datei im migrations/-Verzeichnis ablegen
+    │   → CI/CD-Pipeline informieren (niemals selbst ausführen)
+    │
+    └── Aufgabe = Credentials abfragen / Connection-String anzeigen?
+        → VERWEIGERN — Credentials verbleiben im MCP-Host
+        → Nutzer informieren: Credentials sind MCP-Host-Verantwortung
+```
+
 ### Pflicht-Ablauf für Datenbankjobs
 
 1. **Zugang prüfen** — MCP-Server verfügbar? (`list_tables` als Connectivity-Test)
 2. **Schema iterativ erkunden** — Nur benötigte Tabellen inspizieren (niemals Bulk-Import)
 3. **Read-Only zuerst** — SELECT konstruieren, Ergebnis validieren, bevor Schreib-Ops
 4. **Token-Kontrolle** — LIMIT setzen; Result > 500 Zeilen → Zusammenfassung statt Raw-Dump
-5. **Memory-Persistenz** — Neue Erkenntnisse sofort in SQLite schreiben (nicht am Session-Ende)
+5. **Schreib-Ops als Migration** — SQL als Datei generieren, niemals direkt ausführen
+6. **Memory-Persistenz** — Neue Erkenntnisse sofort in SQLite schreiben (nicht am Session-Ende)
 
 ### Ressource
 
