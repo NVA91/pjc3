@@ -41,10 +41,13 @@ categories:
       lokaler HTTP-Server + Headless-Agent + SQLite-MCP-Server für Entitäten und Kontextbeziehungen
   - name: Frontend / CSS-Framework / Design-System
     description: >
-      Tailwind CSS Utility-First, shadcn/ui und Radix UI Komponentenbibliotheken,
+      Tailwind CSS v3/v4 (CSS-First @theme, @import-Migration, gap statt Margin-Hacks),
+      shadcn/ui und Radix UI Komponentenbibliotheken,
       Anti-generische-KI-Ästhetik (Design-Manifest: verbotene Fonts, Pflicht-Asymmetrien),
       CSS Custom Properties für kohärente Farbpaletten, hardware-beschleunigte
-      Mikrointeraktionen (transform/opacity/will-change), Gradient Meshes, Noise-Overlays
+      Mikrointeraktionen (transform/opacity/will-change), Gradient Meshes, Noise-Overlays,
+      Subagenten-Orchestrierung (component-composition-reviewer, design-verification,
+      a11y-wcag-compliance-auditor) für WCAG 2.1 AA und Figma-Token-Abgleich
   - name: Shell-Scripting
     description: Sichere, wiederholbare Bash/Zsh-Automatisierungen
   - name: Datenformate
@@ -134,6 +137,13 @@ triggers:
   - Hover-, Focus- und Active-States als feinkörnige Mikrointeraktionen gestalten
   - Komponentensystem aus shadcn/ui-Primitives zusammenbauen
   - UI-Komponenten-Bibliothek (Button, Card, Input, Dialog) konfigurieren
+  - Tailwind v4: @tailwind-Direktiven durch @import "tailwindcss" ersetzen
+  - Tailwind v4: tailwind.config.js durch @theme-Direktive in CSS migrieren
+  - Tailwind v4: Margin-Hacks (mt-/ml- auf Kind) durch gap-Utilities auf Parent ersetzen
+  - Dark Mode konsistent via dark:-Klassen implementieren (kein @media-Mix)
+  - Subagenten für Frontend: component-composition-reviewer + design-verification + a11y
+  - WCAG 2.1 AA: Farbkontrast (4.5:1), ARIA-Attribute, Tastaturnavigation prüfen
+  - Figma-Token-Abgleich: Spacing / Farbe / Typografie gegen Design-System verifizieren
   # Shell-Scripting
   - Shell-Skripte erstellen, prüfen oder überarbeiten
   - Bash- oder Zsh-Automatisierungen entwickeln
@@ -1305,15 +1315,195 @@ niemals `width`, `height`, `top`, `left`, `margin` animieren (triggert Layout-Re
 }
 ```
 
+### Tailwind CSS v4 — Neue Konfigurationsparadigmen (CSS-First)
+
+Tailwind v4 bricht mit der JavaScript-Konfigurationsdatei. Die Instruktionen
+**müssen** v4-Projekte von v3-Projekten unterscheiden und entsprechend handeln.
+
+**Erkennungsmerkmal v3 vs. v4:**
+
+```bash
+# v3-Projekt:
+cat tailwind.config.js   # → Datei existiert, enthält module.exports = {...}
+grep "@tailwind" src/    # → @tailwind base; @tailwind components; @tailwind utilities
+
+# v4-Projekt:
+cat package.json | grep tailwind   # → "tailwindcss": "^4.0.0"
+grep "@import" src/     # → @import "tailwindcss";
+```
+
+**Migration v3 → v4 (Agent-Pflichtschritte):**
+
+```
+1. @tailwind-Direktiven ersetzen:
+   VORHER:  @tailwind base;
+            @tailwind components;
+            @tailwind utilities;
+   NACHHER: @import "tailwindcss";
+
+2. tailwind.config.js → @theme-Direktive:
+   VORHER:  module.exports = { theme: { extend: { colors: { brand: '#7c3aed' } } } }
+   NACHHER: In CSS-Datei:
+            @theme {
+              --color-brand: #7c3aed;
+              --font-display: 'Clash Display', system-ui;
+              --spacing-13: 3.25rem;
+            }
+
+3. Margin-Hacks durch gap ersetzen:
+   VORHER:  <div class="flex"><div class="mt-4 ml-6">...</div></div>
+   NACHHER: <div class="flex gap-x-6 gap-y-4">...</div>
+
+4. Dark Mode: Klassen-Varianten statt media-query:
+   VORHER:  @media (prefers-color-scheme: dark) { ... }
+   NACHHER: dark:bg-brand-bg dark:text-brand-text
+            (konsistent durch gesamte App — kein Mix aus beiden Methoden)
+```
+
+**Tailwind v4 CSS-First Konfiguration (vollständig):**
+
+```css
+/* styles/globals.css — Tailwind v4 Entry Point */
+@import "tailwindcss";
+
+/* Design-Tokens via @theme (ersetzt tailwind.config.js vollständig) */
+@theme {
+  /* Schriftarten (Design-Manifest: kein Inter/Roboto) */
+  --font-display: 'Clash Display', 'Syne', system-ui, sans-serif;
+  --font-body:    'Cabinet Grotesk', 'Space Grotesk', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', monospace;
+
+  /* Asymmetrische Spacing-Skala */
+  --spacing-4_5: 1.125rem;
+  --spacing-7_5: 1.875rem;
+  --spacing-13:  3.25rem;
+  --spacing-22:  5.5rem;
+
+  /* Asymmetrische Grid-Templates */
+  --grid-template-columns-7-5: 7fr 5fr;
+  --grid-template-columns-3-7: 3fr 7fr;
+
+  /* Bézier-Kurven */
+  --ease-spring:     cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-smooth-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Keyframes */
+  --animate-fade-up: fade-up 0.4s var(--ease-smooth-out) both;
+  --animate-shimmer: shimmer 1.5s infinite linear;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to   { background-position:  200% 0; }
+}
+
+/* CSS Custom Properties (Design-Tokens, unverändert zu v3) */
+:root {
+  --color-bg-primary:     #0a0a0f;
+  --color-accent-primary: #7c3aed;
+  /* ... (vollständig: python ui_design_system.py css) */
+}
+```
+
+**Verbotene v4-Muster:**
+
+| Verboten | Grund | Korrekt |
+|---|---|---|
+| `@tailwind base/components/utilities` | v3-Syntax, in v4 deprecated | `@import "tailwindcss"` |
+| `module.exports` in tailwind.config.js | v3-API | `@theme { ... }` in CSS |
+| `mt-4 ml-6` auf Kindelementen | Margin-Hacks — fragil, wartungsarm | `gap-x-6 gap-y-4` auf Parent |
+| Mix aus `@media dark` + `dark:` Klassen | Inkonsistentes Dark-Mode-Verhalten | Ausschließlich `dark:` Klassen |
+
+### Subagenten-Orchestrierung für große Frontend-Projekte
+
+Bei komplexen Webprojekten übernimmt nicht ein einzelner Agent alle Aufgaben.
+Stattdessen wird eine spezialisierte Subagenten-Matrix parallel eingesetzt:
+
+```
+Orchestrierer (Haupt-Agent)
+    ├── component-composition-reviewer  → React-Logik + Komponentenstruktur
+    ├── design-verification             → Figma-Token-Abgleich
+    └── a11y-wcag-compliance-auditor    → Barrierefreiheit + WCAG 2.1
+```
+
+**Subagent 1: `component-composition-reviewer`**
+
+- Aufgabe: Reine React-Komponenten-Logik, Props-Typing, State-Management
+- Prüft: Prop-Drilling vermieden? Context oder Zustandsmanager korrekt eingesetzt?
+- Ausgabe: TypeScript-Komponenten mit vollständigen Interface-Deklarationen
+- Darf **nicht** entscheiden: Farben, Abstände, Typografie — das ist design-verification
+
+**Subagent 2: `design-verification`**
+
+- Aufgabe: Abgleich der Implementierung mit Figma-Designtokens
+- Prüft:
+  ```
+  - Entspricht padding-x dem Figma-Token "spacing/component/padding-md" = 18px?
+  - Stimmt font-size mit Figma-Textстиль "body/base" = 16px / Cabinet Grotesk überein?
+  - Ist border-radius identisch mit Figma-Corner-Radius = 3px?
+  - Entspricht Akzentfarbe exakt dem Figma-Token "color/accent/primary" = #7c3aed?
+  ```
+- Ausgabe: Diff-Report: `[PASS]` / `[FAIL: Abweichung]` pro Token
+- Blockiert Commit bei `[FAIL]`-Einträgen
+
+**Subagent 3: `a11y-wcag-compliance-auditor`**
+
+- Aufgabe: Barrierefreiheits-Audit nach WCAG 2.1 AA (gesetzliche Anforderung)
+- Prüft das fertige DOM auf:
+
+| WCAG-Kriterium | Prüfung | Mindest-Anforderung |
+|---|---|---|
+| **1.4.3 Kontrastverhältnis** | Textfarbe vs. Hintergrund | AA: 4.5:1 (normal), 3:1 (groß) |
+| **1.4.11 Nicht-Text-Kontrast** | Buttons, Formulare, Icons | 3:1 gegen Umgebung |
+| **2.1.1 Tastaturnavigation** | Alle Funktionen per Tab erreichbar? | Vollständig |
+| **2.4.7 Fokus sichtbar** | `focus-visible` vorhanden und sichtbar? | Pflicht |
+| **4.1.2 ARIA-Attribute** | role, aria-label, aria-describedby korrekt? | Fehlerlos |
+| **1.3.1 Semantische Struktur** | h1–h6-Hierarchie korrekt? Landmarks? | Vollständig |
+
+- Ausgabe: WCAG-Audit-Report (JSON + Markdown), blockiert Commit bei AA-Verstößen
+
+**Orchestrierungs-Workflow:**
+
+```
+1. Orchestrierer empfängt Feature-Anforderung
+    ↓
+2. component-composition-reviewer schreibt React + TypeScript
+    ↓ (parallel)
+3. design-verification prüft gegen Figma-Tokens
+   a11y-wcag-compliance-auditor prüft DOM auf WCAG 2.1 AA
+    ↓
+4. Beide Agenten liefern Reports an Orchestrierer
+    ↓
+5. Orchestrierer: Alle [PASS]?
+   ├── JA  → git commit (korrekte Nachricht)
+   └── NEIN → Befunde an component-composition-reviewer
+               → Iteration bis alle [PASS]
+```
+
+**Garantien dieser Subagenten-Matrix:**
+- Funktional einwandfrei (component-composition-reviewer)
+- Visuell identisch zu Figma-Design (design-verification)
+- Rechtlich zugänglich — WCAG 2.1 AA (a11y-wcag-compliance-auditor)
+- Architektonisch konsistent zur bestehenden Codebasis
+
 ### Pflicht-Ablauf für UI/UX-Jobs
 
 1. **Design-Manifest erstellen** — Verbotene Fonts und Pflicht-Muster festlegen, bevor eine Zeile CSS geschrieben wird.
-2. **CSS Custom Properties definieren** — Farbpalette, Spacing-Skala, Schriftarten in `:root` zentralisieren.
-3. **Tailwind konfigurieren** — `tailwind.config.js` mit Marken-Farben, asymmetrischen Grids und Custom-Animationen erweitern.
-4. **Hintergrundtextur wählen** — Gradient Mesh und/oder Noise-Overlay definieren; kein Flat-Color-Hintergrund.
-5. **Komponenten customizen** — shadcn/ui-Kopien im Projekt anpassen; Standard-Varianten durch Design-Manifest-konforme ersetzen.
-6. **Mikrointeraktionen prüfen** — Nur `transform`/`opacity` in Transitions; `will-change` und `translate3d(0,0,0)` setzen.
-7. **Visuellen Review** — Screenshot oder Live-Preview; explizit prüfen: Sieht es nach "generischer KI" aus? Wenn ja → Schritt 1.
+2. **Tailwind-Version prüfen** — v3 oder v4? `@tailwind`-Direktiven (v3) vs. `@import "tailwindcss"` + `@theme` (v4).
+3. **CSS Custom Properties definieren** — Farbpalette, Spacing-Skala, Schriftarten in `:root` oder `@theme` zentralisieren.
+4. **Tailwind konfigurieren** — v3: `tailwind.config.js`; v4: `@theme { ... }` in CSS. Asymmetrische Grids, Kurven, Keyframes.
+5. **Hintergrundtextur wählen** — Gradient Mesh und/oder Noise-Overlay definieren; kein Flat-Color-Hintergrund.
+6. **Komponenten customizen** — shadcn/ui-Kopien im Projekt anpassen; Standard-Varianten durch Design-Manifest-konforme ersetzen.
+7. **Mikrointeraktionen prüfen** — Nur `transform`/`opacity` in Transitions; `will-change` und `translate3d(0,0,0)` setzen.
+8. **Dark-Mode konsistent** — Ausschließlich `dark:` Tailwind-Klassen; kein Mix mit `@media prefers-color-scheme`.
+9. **Margin-Hacks eliminieren** — Alle `mt-/ml-/mr-/mb-` auf Kindelementen durch `gap-` auf Parent ersetzen.
+10. **Subagenten-Qualitätssicherung** (bei komplexen Projekten) — design-verification + a11y-wcag-compliance-auditor einsetzen.
+11. **Visuellen Review** — Screenshot oder Live-Preview; explizit prüfen: Sieht es nach "generischer KI" aus? Wenn ja → Schritt 1.
 
 ### Ressource
 
