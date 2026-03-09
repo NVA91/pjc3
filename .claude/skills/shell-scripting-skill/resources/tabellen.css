@@ -1,0 +1,262 @@
+/*
+ * LADESTUFE 3 — RESSOURCE
+ * Quellcode belastet das Kontextfenster nicht. Nur stdout (Ergebnis) wird
+ * dem Modell zurückgegeben. Ausführung in Sandbox auf expliziten Nutzerruf.
+ *
+ * BESCHREIBUNG: Basis-Stylesheet für strukturierte Datentabellen und
+ *               Status-Badges. BEM-Namenskonvention durchgehend.
+ * VERWENDUNG:   <link rel="stylesheet" href="tabellen.css">
+ * ABHÄNGIGKEIT: Keine — reines CSS, kein Framework
+ */
+
+/* =============================================================================
+   DESIGN-TOKENS (CSS Custom Properties)
+   Zentrale Werte — nur hier ändern, nie in Komponenten hardcoden
+   ============================================================================= */
+
+:root {
+  /* Farben — Tabelle */
+  --tab-header-bg:       #2f5496;
+  --tab-header-text:     #ffffff;
+  --tab-header-border:   #1e3a6b;
+  --tab-row-even:        #f5f7fa;
+  --tab-row-hover:       #dbe8f6;
+  --tab-border:          #d1d9e6;
+  --tab-text:            #1a1a2e;
+
+  /* Farben — Status-Badges (unveränderlich laut SKILL.md) */
+  --status-offen-bg:     #fff3cd;
+  --status-offen-text:   #856404;
+  --status-arbeit-bg:    #cfe2ff;
+  --status-arbeit-text:  #084298;
+  --status-erledigt-bg:  #d1e7dd;
+  --status-erledigt-text:#0a3622;
+  --status-blockiert-bg: #f8d7da;
+  --status-blockiert-text:#842029;
+
+  /* Farben — Priorität */
+  --prio-hoch:           #dc3545;
+  --prio-mittel:         #fd7e14;
+  --prio-niedrig:        #6c757d;
+
+  /* Typografie */
+  --font-family:         'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-size-base:      0.875rem;   /* 14px */
+  --font-size-badge:     0.75rem;    /* 12px */
+
+  /* Abstände */
+  --cell-padding:        0.625rem 1rem;
+  --header-padding:      0.75rem 1rem;
+  --badge-padding:       0.2rem 0.6rem;
+
+  /* Sonstiges */
+  --border-radius-badge: 9999px;
+  --transition-hover:    background-color 0.15s ease;
+}
+
+/* =============================================================================
+   BLOCK: daten-tabelle
+   Vollständige, responsive Datentabelle mit farbigem Header
+   ============================================================================= */
+
+.daten-tabelle {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  color: var(--tab-text);
+}
+
+/* Element: Header-Zelle */
+.daten-tabelle__header {
+  background-color: var(--tab-header-bg);
+  color: var(--tab-header-text);
+  padding: var(--header-padding);
+  text-align: left;
+  font-weight: 600;
+  border: 1px solid var(--tab-header-border);
+  user-select: none;
+}
+
+.daten-tabelle__header--zentriert {
+  text-align: center;
+}
+
+/* Element: Daten-Zeile */
+.daten-tabelle__zeile:nth-child(even) {
+  background-color: var(--tab-row-even);
+}
+
+.daten-tabelle__zeile:hover {
+  background-color: var(--tab-row-hover);
+  transition: var(--transition-hover);
+}
+
+/* Element: Daten-Zelle */
+.daten-tabelle__zelle {
+  padding: var(--cell-padding);
+  border: 1px solid var(--tab-border);
+  vertical-align: top;
+}
+
+.daten-tabelle__zelle--zentriert {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.daten-tabelle__zelle--mono {
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 0.8rem;
+}
+
+/* Modifier: kompakte Variante */
+.daten-tabelle--kompakt .daten-tabelle__header,
+.daten-tabelle--kompakt .daten-tabelle__zelle {
+  padding: 0.35rem 0.6rem;
+}
+
+/* =============================================================================
+   BLOCK: status-badge
+   Farbige Inline-Badges für Aufgaben-Status
+   Status-Farben sind unveränderlich (definiert in SKILL.md)
+   ============================================================================= */
+
+.status-badge {
+  display: inline-block;
+  padding: var(--badge-padding);
+  border-radius: var(--border-radius-badge);
+  font-size: var(--font-size-badge);
+  font-weight: 600;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+/* Modifier: Status-Typen */
+.status-badge--offen {
+  background-color: var(--status-offen-bg);
+  color: var(--status-offen-text);
+}
+
+.status-badge--in-arbeit {
+  background-color: var(--status-arbeit-bg);
+  color: var(--status-arbeit-text);
+}
+
+.status-badge--erledigt {
+  background-color: var(--status-erledigt-bg);
+  color: var(--status-erledigt-text);
+}
+
+.status-badge--blockiert {
+  background-color: var(--status-blockiert-bg);
+  color: var(--status-blockiert-text);
+}
+
+/* =============================================================================
+   BLOCK: prio-badge
+   Inline-Badge für Aufgaben-Priorität
+   ============================================================================= */
+
+.prio-badge {
+  display: inline-block;
+  padding: var(--badge-padding);
+  border-radius: var(--border-radius-badge);
+  font-size: var(--font-size-badge);
+  font-weight: 700;
+  white-space: nowrap;
+  background-color: transparent;
+}
+
+.prio-badge--hoch     { color: var(--prio-hoch);    border: 1.5px solid var(--prio-hoch); }
+.prio-badge--mittel   { color: var(--prio-mittel);  border: 1.5px solid var(--prio-mittel); }
+.prio-badge--niedrig  { color: var(--prio-niedrig); border: 1.5px solid var(--prio-niedrig); }
+
+/* =============================================================================
+   BLOCK: aufgaben-liste
+   Kompakte Listenansicht als Alternative zur Tabelle
+   ============================================================================= */
+
+.aufgaben-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.aufgaben-liste__eintrag {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background-color: #ffffff;
+  border: 1px solid var(--tab-border);
+  border-radius: 6px;
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+}
+
+/* Modifier: Status-Varianten der Listenzeile */
+.aufgaben-liste__eintrag--erledigt {
+  opacity: 0.6;
+  text-decoration: line-through;
+}
+
+.aufgaben-liste__eintrag--blockiert {
+  border-left: 4px solid var(--prio-hoch);
+}
+
+.aufgaben-liste__eintrag--dringend {
+  border-left: 4px solid var(--prio-mittel);
+  background-color: #fff8f0;
+}
+
+/* Element: Text innerhalb eines Eintrags */
+.aufgaben-liste__titel {
+  flex: 1;
+  font-weight: 500;
+}
+
+.aufgaben-liste__meta {
+  font-size: var(--font-size-badge);
+  color: #6b7280;
+  white-space: nowrap;
+}
+
+/* =============================================================================
+   UTILITY: Responsive Tabellen-Wrapper
+   Horizontales Scrollen auf kleinen Viewports
+   ============================================================================= */
+
+.tabellen-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* =============================================================================
+   VERWENDUNGS-BEISPIEL (HTML-Kommentar — nicht gerendert)
+
+   <div class="tabellen-wrapper">
+     <table class="daten-tabelle">
+       <thead>
+         <tr>
+           <th class="daten-tabelle__header">ID</th>
+           <th class="daten-tabelle__header">Aufgabe</th>
+           <th class="daten-tabelle__header daten-tabelle__header--zentriert">Status</th>
+         </tr>
+       </thead>
+       <tbody>
+         <tr class="daten-tabelle__zeile">
+           <td class="daten-tabelle__zelle">1</td>
+           <td class="daten-tabelle__zelle">Projektplan erstellen</td>
+           <td class="daten-tabelle__zelle daten-tabelle__zelle--zentriert">
+             <span class="status-badge status-badge--offen">Offen</span>
+           </td>
+         </tr>
+       </tbody>
+     </table>
+   </div>
+
+   ============================================================================= */
