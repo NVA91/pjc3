@@ -141,6 +141,8 @@ Commit-History (Konvention aus bisherigen Commits):
 
 Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-manager/SKILL.md`
 
+Shell-Scripting, CSV, Excel, CSS → siehe `@.claude/skills/shell-scripting-skill/SKILL.md`
+
 ---
 
 ## Docker-Sicherheit: Immutable Configuration Infrastructure
