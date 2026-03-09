@@ -19,7 +19,12 @@ categories:
   - name: Vision
     description: >
       Bildbeschreibung, Dokumentenextraktion (Rechnungen/Quittungen),
-      Diagramm-Analyse, Screenshot-Auswertung, Batch-Verarbeitung
+      Diagramm-Analyse, Screenshot-Auswertung, Batch-Verarbeitung,
+      PDF-Chunking, Graphlit-Integration, OCR-Prompt-Engineering
+  - name: Visualisierung
+    description: >
+      Deklarative Diagramme (Mermaid, PlantUML, D2, Graphviz): Flowcharts,
+      Gantt, Sequenz, C4, ERD, Sankey — aus Text, CSV oder Meeting-Notizen
   - name: Shell-Scripting
     description: Sichere, wiederholbare Bash/Zsh-Automatisierungen
   - name: Datenformate
@@ -56,6 +61,16 @@ triggers:
   - Visuelle Informationen in JSON oder Markdown überführen
   - OCR-ähnliche Extraktion aus analogen Dokumenten durchführen
   - Automatisierte Reporting-Workflows mit Bildinput aufbauen
+  # Visualisierung / Diagramme
+  - Flussdiagramm oder Prozessablauf als Mermaid/PlantUML generieren
+  - Gantt-Diagramm aus CSV-Daten oder Projektplan erstellen
+  - Sequenzdiagramm für API-Interaktionen oder Workflows zeichnen
+  - C4-Modell für Systemarchitektur oder Komponenten erstellen
+  - Entity-Relationship-Diagramm (ERD) aus Datenbankschema generieren
+  - Sankey-Diagramm für Volumenverteilungen oder Datenflüsse erstellen
+  - Diagramm-Code in SVG oder PNG rendern (mmdc, dot, d2, plantuml)
+  - Meeting-Notizen oder Prozessbeschreibung in Flowchart überführen
+  - D2 oder Graphviz DOT-Code für komplexe Graphen schreiben
   # Shell-Scripting
   - Shell-Skripte erstellen, prüfen oder überarbeiten
   - Bash- oder Zsh-Automatisierungen entwickeln
@@ -68,6 +83,7 @@ resources:
   - resources/csv_etl_pipeline.py
   - resources/excel_finanzmodell.py
   - resources/vision_dokument.py
+  - resources/diagramm_generator.py
   - resources/shell_template.sh
   - resources/csv_verarbeitung.py
   - resources/excel_aufgaben.py
@@ -307,6 +323,84 @@ python vision_dokument.py batch ./rechnungen/ rechnung \
   > rechnungen_verifiziert.csv
 ```
 
+### Infrastrukturelle Herausforderungen & Skalierung
+
+Rohe API-Aufrufe stoßen bei hochskalierenden Office-Anwendungen an Grenzen.
+Pflicht-Überlegungen vor dem Einsatz:
+
+| Herausforderung | Ursache | Lösung |
+|---|---|---|
+| **Token-Limit bei PDFs** | Jede Seite ≈ 1.500–3.000 Token; 100-Seiten-PDF > Kontext-Fenster | PDF → Bilder (1 Bild/Seite) + Chunking; `vision_dokument.py batch` |
+| **API-Ratenlimits** | Burst > 50 req/min triggert 429-Fehler | Exponentieller Backoff + Queue (max 3 Retry); Graphlit übernimmt dies |
+| **Tabellenstruktur-Verlust** | Modell ignoriert Zellen-Grenzen ohne expliziten Prompt | Prompt muss explizit fordern: `Behalte alle Zeilenumbrüche und Tabellenstruktur exakt bei` |
+| **Ausgabe-Inkonsistenz** | JSON-Schema weicht bei seltenen Layouts ab | JSON-Schema im System-Prompt mitgeben; `IFERROR`-ähnliches Fallback in Parser |
+| **Hochskalierbar (> 100 Seiten)** | Eigenimplementierung von Chunking + Retry zu komplex | Graphlit-Integration: übernimmt Chunking, Ratenlimit, Normalisierung |
+
+**Prompt-Engineering für OCR-ähnliche Aufgaben (Pflicht):**
+
+```
+System-Prompt Ergänzung für Tabellenextraktion:
+"Behalte alle Zeilenumbrüche EXAKT bei. Trenne Tabellenspalten mit | (Pipe).
+ Füge nach jeder Tabellenzeile einen Newline ein. Verliere keine Zelle."
+```
+
+**Graphlit-Integration (für Enterprise-Scale):**
+- Graphlit übernimmt: PDF-to-Image-Konvertierung, Seiten-Chunking, Retry-Logik, Output-Normalisierung
+- Das Modell ist exklusiv für semantische und visuelle Extraktion zuständig
+- Schnittstelle: Graphlit MCP-Server → `get_document_content` → Ergebnis an ETL-Pipeline
+
+---
+
+## Grafiken und Diagramme — Deklarative Visualisierung
+
+Anstatt Pixel manuell zu verschieben, übersetzt der Agent abstrakte Beschreibungen,
+Meeting-Notizen oder CSV-Datenströme in exakten, maschinenlesbaren Diagramm-Code.
+Rendering-Engines (mmdc, dot, d2, plantuml) erzeugen daraus SVG oder PNG.
+
+### Tool-Auswahl nach Diagramm-Typ
+
+| Diagramm-Typ | Empfohlenes Tool | Stärke | Wann verwenden |
+|---|---|---|---|
+| **Flowchart / Entscheidungsbaum** | Mermaid.js | Web-nativ, Markdown-einbettbar | Prozesse, Workflows, Decision Trees |
+| **Sequenzdiagramm** | Mermaid.js / PlantUML | Präzise Lebenslinien, Aktivierungen | API-Interaktionen, Protokolle |
+| **Gantt-Diagramm** | Mermaid.js | Einfache Syntax, CSV-kompatibel | Projektplanung, Meilensteine |
+| **C4-Modell** | PlantUML (C4-Lib) | Strukturierte 4-Level-Architektur | System-/Container-/Komponenten-Sicht |
+| **ERD (Entity-Relationship)** | Mermaid.js / PlantUML | Relationen, Kardinalitäten | Datenbankschema, Datenmodelle |
+| **Sankey-Diagramm** | D2 / Graphviz | Volumenflüsse, Proportionen | Ressourcenverteilung, Datenflüsse |
+| **Komplexe Graphen** | Graphviz DOT | Beliebige Knoten-/Kanten-Layouts | Abhängigkeits-Graphen, Netzwerke |
+
+### Rendering-Pipeline
+
+```
+Beschreibung / CSV / Meeting-Notizen
+    ↓
+diagramm_generator.py <typ> (Claude API generiert Code)
+    ↓
+Diagramm-Code (Mermaid / PlantUML / D2 / DOT) → stdout
+    ↓  (optional, wenn lokale Tools installiert)
+Rendering: mmdc | plantuml | d2 | dot
+    ↓
+SVG / PNG-Datei
+```
+
+### Rendering-Voraussetzungen (optional, lokal)
+
+| Tool | Install | Für |
+|---|---|---|
+| `mmdc` (Mermaid CLI) | `npm install -g @mermaid-js/mermaid-cli` | Mermaid → SVG/PNG |
+| `plantuml` | `apt install plantuml` | PlantUML → SVG/PNG |
+| `d2` | `curl -fsSL https://d2lang.com/install.sh \| sh` | D2 → SVG/PNG |
+| `dot` (Graphviz) | `apt install graphviz` | DOT → SVG/PNG |
+
+### Pflicht-Ablauf für jeden Diagram-Job
+
+1. **Diagramm-Typ klären** — Flowchart / Gantt / Sequenz / C4 / ERD / Sankey?
+2. **Input-Format prüfen** — Freitext, CSV oder strukturierte Beschreibung?
+3. **Tool wählen** — Tool-Tabelle konsultieren; Standard: Mermaid (web-kompatibel)
+4. **Code generieren** — `diagramm_generator.py` aufrufen; Code nach stdout
+5. **Rendern** — Lokal (wenn Tool installiert) oder Code in Online-Editor zeigen
+6. **Nutzer-Review** — Code und visuelle Vorschau zeigen, Anpassungen iterieren
+
 ---
 
 ## Sicherheitsregeln — niemals verletzen
@@ -404,6 +498,7 @@ Für Prozesse: Nummerierte Schrittliste mit Entscheidungspunkten.
 | `resources/csv_etl_pipeline.py` | 3 | Office-Arbeit | Polars-ETL: Discovery, Schema, Bereinigung, Transformation, Data Warehousing |
 | `resources/excel_finanzmodell.py` | 3 | Office-Arbeit | 3-Statement-Modell, SaaS-Metriken, Szenario-Analyse, Formelinjektion, Verifikation |
 | `resources/vision_dokument.py` | 3 | Vision | Claude Vision API: Rechnung/Diagramm/Screenshot/Batch → JSON oder Markdown |
+| `resources/diagramm_generator.py` | 3 | Visualisierung | Mermaid/PlantUML/D2/Graphviz-Code generieren + optional rendern (SVG/PNG) |
 | `resources/csv_verarbeitung.py` | 3 | Datenformate | CSV lesen/schreiben/filtern (Stdlib, einfache Ops) |
 | `resources/shell_template.sh` | 3 | Shell-Scripting | Vollständige sichere Bash-Vorlage |
 | `resources/excel_aufgaben.py` | 3 | Office-Arbeit | Excel-Aufgabentabelle mit Status-Farben (einfach) |
