@@ -8,8 +8,9 @@ name: shell-scripting-skill
 description: >
   Sichere, strukturierte und wiederholbare Shell-Skripte sowie Office-Automatisierung:
   ETL-Pipelines (CSV/Polars/Pandas), Excel-Finanzmodelle (.xlsx) mit Formelinjektion,
-  Data Warehousing, CSS und visuelle Aufbereitung. Keine Dateien oder Pfade werden
-  ohne ausdrückliche Nutzerfreigabe geöffnet oder verändert.
+  Data Warehousing, CSS und visuelle Aufbereitung. Agenten-Ausführung in leichtgewichtigen,
+  kurzlebigen Docker-Containern (node:20-slim, Non-Root, UID-Passthrough).
+  Keine Dateien oder Pfade werden ohne ausdrückliche Nutzerfreigabe geöffnet oder verändert.
 
 categories:
   - name: Office-Arbeit
@@ -25,6 +26,11 @@ categories:
     description: >
       Deklarative Diagramme (Mermaid, PlantUML, D2, Graphviz): Flowcharts,
       Gantt, Sequenz, C4, ERD, Sankey — aus Text, CSV oder Meeting-Notizen
+  - name: Container-Ausführung
+    description: >
+      Agenten in kurzlebigen Docker-Containern: node:20-slim (Debian, kein Alpine),
+      Non-Root-User (useradd -m -u 1001), UID-Passthrough (-u $(id -u):$(id -g)),
+      ephemere Dateisysteme (--rm), Volume-Mounts mit Schreibrecht-Kontrolle
   - name: Shell-Scripting
     description: Sichere, wiederholbare Bash/Zsh-Automatisierungen
   - name: Datenformate
@@ -71,6 +77,15 @@ triggers:
   - Diagramm-Code in SVG oder PNG rendern (mmdc, dot, d2, plantuml)
   - Meeting-Notizen oder Prozessbeschreibung in Flowchart überführen
   - D2 oder Graphviz DOT-Code für komplexe Graphen schreiben
+  # Container-Ausführung / Docker / Agent-Isolation
+  - Dockerfile für Agenten-Ausführung erstellen (node:20-slim, Non-Root)
+  - Warum Alpine für NPM-Agenten ungeeignet ist (musl libc Linker-Fehler)
+  - Non-Root-User im Container anlegen (useradd -m -u 1001)
+  - Docker-Basis-Image für CLI-Agenten wählen und sichern
+  - docker run mit UID-Passthrough (-u $(id-u):$(id-g)) konfigurieren
+  - Read-Only-Filesystem-Fehler durch fehlenden UID-Passthrough debuggen
+  - Kurzlebige Container mit --rm und Volume-Mount für Workspace aufsetzen
+  - Agenten-Dateisystem nach Session-Ende rückstandslos verwerfen
   # Shell-Scripting
   - Shell-Skripte erstellen, prüfen oder überarbeiten
   - Bash- oder Zsh-Automatisierungen entwickeln
@@ -84,6 +99,7 @@ resources:
   - resources/excel_finanzmodell.py
   - resources/vision_dokument.py
   - resources/diagramm_generator.py
+  - resources/docker_agent_run.sh
   - resources/shell_template.sh
   - resources/csv_verarbeitung.py
   - resources/excel_aufgaben.py
@@ -403,6 +419,130 @@ SVG / PNG-Datei
 
 ---
 
+## Agenten-Ausführung in leichtgewichtigen Containern
+
+Agenten-Prozesse werden in kurzlebige, ephemere Docker-Container ausgelagert.
+Das Container-Dateisystem wird nach Beendigung der Session rückstandslos verworfen (`--rm`).
+Diese Architektur verhindert persistente Seiteneffekte und Konfigurationsdrift.
+
+### Basis-Image-Wahl: node:20-slim (Debian) — NICHT Alpine
+
+| Kriterium | `node:20-slim` (Debian) | `node:20-alpine` (Alpine) |
+|---|---|---|
+| **C-Bibliothek** | glibc (GNU standard) | musl libc |
+| **Native NPM-Pakete** | Vollständig kompatibel | Häufig Linker-Fehler bei nativen Modulen |
+| **CLI-Agenten** (z.B. `@anthropic-ai/claude-code`) | Problemlos | Kryptische Fehler möglich |
+| **Image-Größe** | ~200 MB (slim) | ~100 MB |
+| **Empfehlung** | **Pflicht für NPM-CLI-Agenten** | Nur für einfache Node.js-Anwendungen |
+
+**Warum musl libc Probleme macht:**
+Native NPM-Pakete (`*.node`-Binaries) werden gegen glibc kompiliert. Alpine's musl libc ist
+nicht ABI-kompatibel — beim Laden der Binary tritt ein Linker-Fehler auf:
+`Error loading shared library libstdc++.so.6: No such file or directory`.
+Workarounds (Kompatibilitäts-Pakete, Cross-Compilation) sind fragil und nicht produktionsgeeignet.
+
+### Sicherheitskonformes Dockerfile (Standard-Template)
+
+```dockerfile
+# PFLICHT: node:20-slim (Debian-basiert) — KEIN Alpine (musl libc Inkompatibilität)
+FROM node:20-slim
+
+# Non-Root-User anlegen: UID 1001 (feste Zuweisung, nicht root)
+# -m → Home-Verzeichnis anlegen (/home/claude)
+# -u 1001 → feste UID, entspricht CLAUDE-Agent-Konvention aus CLAUDE.md
+RUN useradd -m -u 1001 claude
+
+# CLI-Agent global installieren (als root, vor USER-Wechsel)
+RUN npm install -g @anthropic-ai/claude-code
+
+# Workspace-Verzeichnis vorbereiten
+WORKDIR /workspace
+
+# Wechsel zum Non-Root-User VOR dem Entrypoint — kritisch für Sicherheit
+USER claude
+
+ENTRYPOINT ["claude"]
+```
+
+**Warum `USER claude` vor `ENTRYPOINT`?**
+Wird der ENTRYPOINT als root ausgeführt, hat ein kompromittierter Agent-Prozess
+effektive root-Rechte im Container. Der Wechsel zu UID 1001 reduziert den
+Privilege-Level auf das absolute Minimum — konsistent mit dem UID-Namespace-
+Isolations-Prinzip aus CLAUDE.md (Gebot UID-Namespace-Isolation).
+
+### Laufzeit-Orchestrierung: docker run mit UID-Passthrough
+
+```bash
+# PFLICHT-Kommando für Lese- und Schreiboperationen:
+docker run --rm \
+  -v "$(pwd):/workspace" \
+  -u "$(id -u):$(id -g)" \
+  claude-agent-image \
+  <claude-argumente>
+```
+
+**Parameter-Erklärung:**
+
+| Parameter | Wert | Zweck |
+|---|---|---|
+| `--rm` | — | Container-Dateisystem nach Beendigung löschen (ephemer) |
+| `-v "$(pwd):/workspace"` | Host-CWD → `/workspace` | Agent kann Host-Dateien lesen und schreiben |
+| `-u "$(id -u):$(id -g)"` | Host-UID:GID | UID-Passthrough — kritisch für Schreibrecht |
+
+**Warum `-u $(id -u):$(id -g)` kritisch ist:**
+
+```
+Ohne -u:
+  Container läuft als UID 1001 (claude)
+  Host-Dateien gehören UID 1000 (lokaler User)
+  → Schreibzugriff verweigert: "Read-Only Filesystem"-Fehler
+  → Agent kann keine Dateien im gemounteten Volume erzeugen/ändern
+
+Mit -u $(id-u):$(id-g):
+  Container übernimmt Host-UID und Host-GID
+  → Dateieigentümer stimmt überein → Vollständiger Lese-/Schreibzugriff
+  → Neu erzeugte Dateien gehören dem Host-User (kein sudo nötig)
+```
+
+**Fehler-Diagnose — "Read-Only Filesystem" im Container:**
+
+```
+Symptom: agent error: EROFS: read-only file system, open '/workspace/output.json'
+Ursache:  -u-Flag fehlt → Container-UID ≠ Host-Datei-UID
+Fix:      docker run ... -u "$(id -u):$(id -g)" ...
+```
+
+### Erweitertes Run-Kommando (mit Umgebungsvariablen)
+
+```bash
+docker run --rm \
+  -v "$(pwd):/workspace" \
+  -u "$(id -u):$(id -g)" \
+  -e ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY}" \
+  --network host \
+  claude-agent-image \
+  --print "Analysiere /workspace/daten.csv und schreibe Ergebnis nach /workspace/ergebnis.json"
+```
+
+**Sicherheits-Hinweise zum erweiterten Kommando:**
+- `-e ANTHROPIC_API_KEY` → API-Key als Umgebungsvariable (kein File-Mount, da Claude Code ihn aus `$env` liest)
+- `--network host` → Nur wenn Agent externe APIs aufrufen muss; andernfalls weglassen
+- `--network none` → Vollständige Netzwerk-Isolation für rein lokale Verarbeitungsaufgaben
+
+### Pflicht-Ablauf für Container-Agenten-Setup
+
+1. **Image wählen** — `node:20-slim` (Pflicht); Alpine explizit ablehnen
+2. **Non-Root-User** — `useradd -m -u 1001 claude`; UID mit CLAUDE.md-Konvention abgleichen
+3. **Schreibrecht-Test** — `docker run --rm -v "$(pwd):/workspace" -u "$(id -u):$(id -g)" image touch /workspace/test.txt`
+4. **Ephemer-Verhalten prüfen** — `--rm` Flag bestätigen; kein named Volume für Session-Daten
+5. **API-Key** — Nur über `-e`-Flag übergeben; kein Hardcoding in Dockerfile oder Image
+
+### Ressource
+
+Vollständiges Build-und-Run-Skript: `resources/docker_agent_run.sh` (Ladestufe 3)
+
+---
+
 ## Sicherheitsregeln — niemals verletzen
 
 - **Kein Dateizugriff ohne Freigabe**: Keine Datei öffnen, lesen oder schreiben ohne explizite Nutzererlaubnis.
@@ -499,6 +639,7 @@ Für Prozesse: Nummerierte Schrittliste mit Entscheidungspunkten.
 | `resources/excel_finanzmodell.py` | 3 | Office-Arbeit | 3-Statement-Modell, SaaS-Metriken, Szenario-Analyse, Formelinjektion, Verifikation |
 | `resources/vision_dokument.py` | 3 | Vision | Claude Vision API: Rechnung/Diagramm/Screenshot/Batch → JSON oder Markdown |
 | `resources/diagramm_generator.py` | 3 | Visualisierung | Mermaid/PlantUML/D2/Graphviz-Code generieren + optional rendern (SVG/PNG) |
+| `resources/docker_agent_run.sh` | 3 | Container-Ausführung | node:20-slim Dockerfile + docker run mit UID-Passthrough; ephemere Agent-Container |
 | `resources/csv_verarbeitung.py` | 3 | Datenformate | CSV lesen/schreiben/filtern (Stdlib, einfache Ops) |
 | `resources/shell_template.sh` | 3 | Shell-Scripting | Vollständige sichere Bash-Vorlage |
 | `resources/excel_aufgaben.py` | 3 | Office-Arbeit | Excel-Aufgabentabelle mit Status-Farben (einfach) |
