@@ -67,6 +67,11 @@ categories:
     description: Sichere, wiederholbare Bash/Zsh-Automatisierungen
   - name: Datenformate
     description: CSV, Excel (.xlsx), CSS
+  - name: Python Best Practices & Code-Modernisierung
+    description: >
+      Senior-Python-Architektur: Python 3.10+ mit strikten Type Hints,
+      pydantic/dataclasses für Datenvalidierung, async/await für I/O-Operationen,
+      Google Python Style Guide, produktionsreifer und wartbarer Code
 
 triggers:
   # Office-Arbeit / ETL / Data Warehousing
@@ -184,6 +189,16 @@ triggers:
   # Shell-Scripting
   - Shell-Skripte erstellen, prüfen oder überarbeiten
   - Bash- oder Zsh-Automatisierungen entwickeln
+  # Python Best Practices & Code-Modernisierung
+  - Python-Code auf Python 3.10+ modernisieren oder refactorn
+  - Strikte Type Hints (PEP 484/526/604) in Python-Codebase einführen
+  - Datenstrukturen mit pydantic oder dataclasses validieren und typisieren
+  - I/O-Operationen mit async/await-Mustern optimieren
+  - Google Python Style Guide anwenden oder Codebase danach prüfen
+  - Produktionsreifen, wartbaren Python-Code schreiben
+  - Python-Projekt für professionelle Repositories aufbereiten
+  - asyncio-Event-Loop oder aiohttp-Muster einrichten
+  - Typsicherheit in Python-Skripten oder -Bibliotheken durchsetzen
   # Weitere Datenformate
   - CSS-Dateien strukturieren, benennen (BEM) oder stylen
   - Komplexe Inhalte in Tabellen- oder Baumstruktur aufbereiten
@@ -2006,6 +2021,84 @@ auch den Decay.
 | **Netzwerk** | Vollständig isoliert (kein Egress) | Isoliert + Whitelist für Package-Registry |
 | **Session-Länge** | Max. 60 Min. bei Finanzdaten | Max. 90 Min. bei komplexem Code |
 | **Subagenten-Trigger** | Bei jeder Datenquellenänderung | Bei Domänenwechsel (ETL→Viz→Pptx) |
+
+---
+
+## Python Best Practices & Code-Modernisierung
+
+Du agierst als Senior Python Architect. Dein Code muss zwingend den modernsten Standards (Python 3.10+) entsprechen.
+
+**Agenten-Anweisung:**
+- Verwende ausnahmslos strikte Type Hints und validiere komplexe Datenstrukturen bevorzugt mit `pydantic` oder `dataclasses`.
+- Optimiere I/O-Operationen durch moderne `async/await`-Muster und halte dich strikt an den [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html).
+
+**Erwartetes Verhalten:** Der Agent liefert keine Quick-and-Dirty-Skripte, sondern produktionsreifen, typsicheren und wartbaren Code, der direkt in professionelle Repositories übernommen werden kann.
+
+---
+
+### Pflicht-Checkliste für Python-Code
+
+| Regel | Beispiel |
+|---|---|
+| Python 3.10+ Syntax | `match`/`case`, `X \| Y` Union-Type |
+| Strikte Type Hints | `def fn(x: int) -> str:` — keine ungetypten Signaturen |
+| Komplexe Structs via pydantic | `class Config(BaseModel): host: str` |
+| I/O immer async | `async def fetch(...) -> bytes:` + `aiohttp`/`asyncio` |
+| Google Style Guide | Docstrings im Google-Format, `snake_case`, max. 80 Zeichen |
+| Kein Mutable Default | `def fn(items: list[str] \| None = None)` statt `= []` |
+| Explizite Exception-Types | `except ValueError as e:` — kein nacktes `except:` |
+
+---
+
+### Async/Await — Pflichtmuster
+
+```python
+import asyncio
+import aiohttp
+from pydantic import BaseModel
+from typing import Any
+
+class ApiResponse(BaseModel):
+    status: int
+    data: dict[str, Any]
+
+async def fetch_data(url: str, session: aiohttp.ClientSession) -> ApiResponse:
+    """Fetch JSON data from URL.
+
+    Args:
+        url: Target endpoint URL.
+        session: Shared aiohttp session.
+
+    Returns:
+        Parsed API response.
+
+    Raises:
+        aiohttp.ClientError: On network failure.
+    """
+    async with session.get(url) as response:
+        payload = await response.json()
+        return ApiResponse(status=response.status, data=payload)
+
+async def main() -> None:
+    async with aiohttp.ClientSession() as session:
+        result = await fetch_data("https://api.example.com/data", session)
+        print(result.status)
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+---
+
+### Typ-Hierarchie (Entscheidungsbaum)
+
+```
+Ist die Datenstruktur einfach (2–3 Felder, keine Validierung)?
+    └── Ja   → dataclass mit @dataclass(frozen=True)
+    └── Nein → Braucht sie Laufzeit-Validierung oder JSON-Serialisierung?
+                   └── Ja   → pydantic BaseModel
+                   └── Nein → TypedDict (nur statische Hints, kein Overhead)
+```
 
 ---
 
