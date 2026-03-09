@@ -6,20 +6,40 @@
 
 name: shell-scripting-skill
 description: >
-  Sichere, strukturierte und wiederholbare Shell-Skripte sowie Arbeit mit
-  CSV-Dateien, Excel-Tabellen (.xlsx) und CSS. Keine Dateien oder Pfade werden
-  ohne ausdrückliche Nutzerfreigabe geöffnet oder verändert.
+  Sichere, strukturierte und wiederholbare Shell-Skripte sowie Office-Automatisierung:
+  ETL-Pipelines (CSV/Polars/Pandas), Excel-Tabellen (.xlsx), CSS und visuelle
+  Aufbereitung. Keine Dateien oder Pfade werden ohne ausdrückliche Nutzerfreigabe
+  geöffnet oder verändert.
+
+categories:
+  - name: Office-Arbeit
+    description: Datenadministration, ETL-Pipelines, Analyse und Visualisierung
+  - name: Shell-Scripting
+    description: Sichere, wiederholbare Bash/Zsh-Automatisierungen
+  - name: Datenformate
+    description: CSV, Excel (.xlsx), CSS
 
 triggers:
+  # Office-Arbeit / ETL
+  - ETL-Pipeline aufbauen oder automatisieren (Extract, Transform, Load)
+  - CSV-Dateien scannen, bereinigen, normalisieren oder konsolidieren
+  - Polars oder Pandas für Datentransformation einsetzen
+  - Schema einer CSV-Datei inspizieren oder Datentypen prüfen
+  - Daten deduplizieren oder Datumsformate normalisieren
+  - Mehrere CSV-Dateien zusammenführen (concat/merge)
+  - SQL-ähnliche Abfragen auf flachen Dateien ausführen
+  - Daten-Einlagerung in strukturierte Formate automatisieren
+  # Shell-Scripting
   - Shell-Skripte erstellen, prüfen oder überarbeiten
   - Bash- oder Zsh-Automatisierungen entwickeln
-  - CSV-Dateien lesen, filtern, transformieren oder schreiben
+  # Weitere Datenformate
   - Excel-Tabellen (.xlsx) für Aufgabenverwaltung erstellen oder pflegen
   - CSS-Dateien strukturieren, benennen (BEM) oder stylen
   - Komplexe Inhalte in Tabellen- oder Baumstruktur aufbereiten
   - Expliziter Aufruf via /shell-scripting-skill
 
 resources:
+  - resources/csv_etl_pipeline.py
   - resources/shell_template.sh
   - resources/csv_verarbeitung.py
   - resources/excel_aufgaben.py
@@ -48,6 +68,53 @@ resources:
 | 1 | Metadaten (YAML-Frontmatter) | Initial beim Session-Start | ~100 Token | Trigger-Mechanismus: Relevanz-Bewertung durch das Modell |
 | 2 | Instruktionen (diese Datei) | On-Demand bei semantischer Übereinstimmung | < 5.000 Token | Prozessschritte, Regeln, Leitplanken |
 | 3 | Ressourcen (externe Skripte) | Bei explizitem Aufruf während der Ausführung | Nur stdout wird verrechnet | Skripte laufen in Sandbox; Quellcode belastet Kontextfenster nicht |
+
+---
+
+## Hauptkategorie 1: Office-Arbeit — Datenadministration, Analyse und Visualisierung
+
+KI-gestützte Office-Automatisierung agiert als deterministische Ausführungsmaschine:
+Rohdatenströme werden in reproduzierbare, strukturierte und visuell aufbereitete Formate überführt.
+Das Modell übernimmt ETL-Prozesse, generiert institutionelle Berichte und erstellt Entscheidungshilfen.
+
+### ETL-Pipeline: Orchestrierungs-Phasen
+
+| Phase | CSV-Verarbeitung | Technologie / MCP-Tool | Resultat |
+|---|---|---|---|
+| **1. Discovery** | Autonomes Scannen von Verzeichnissen nach neuen Datenexporten | MCP `get_files_list` + Glob-Muster | System findet Rohdaten ohne manuelles Hochladen |
+| **2. Schema-Inspektion** | Analyse der internen Dateistruktur vor der Verarbeitung | MCP `get_schema` → `df.schema.items()` | Modell versteht Entitäten, verhindert Datentypfehler |
+| **3. Bereinigung & Normalisierung** | Fehlerbehebung, Deduplizierung, Standardisierung | `csv_etl_pipeline.py` → Polars/Pandas | Unicode-Fehler, Datumsformate und Duplikate korrigiert |
+| **4. Sichere Transformation** | Aggregation, Filterung, Datei-Zusammenführung | `execute_polars_sql` + `pl.concat` | Konsolidierte Datensätze, einlagerungsbereit |
+
+### Werkzeugwahl — wann MCP, wann Python-Ressource?
+
+```
+Aufgabe erfordert Dateisystem-Zugriff (Verzeichnis scannen, Schema lesen)?
+├── Ja  → MCP-Tools: get_files_list / get_schema
+│          → Ergebnis (stdout) an Python-Ressource weitergeben
+└── Nein → Direkt: resources/csv_etl_pipeline.py (Ladestufe 3)
+           Modi: entdecken | inspizieren | bereinigen | transformieren | pipeline
+```
+
+### Pflicht-Ablauf für jeden ETL-Job
+
+1. **Discovery-Ergebnis zeigen** — Gefundene Dateien dem Nutzer auflisten, bevor Verarbeitung startet.
+2. **Schema kommunizieren** — Erkannte Spalten und Datentypen vor Phase 3 bestätigen lassen.
+3. **Bereinigungsplan vorlegen** — Welche Korrekturen werden durchgeführt? Erst nach Freigabe ausführen.
+4. **Transformations-Output nach stdout** — Niemals direkt in Produktionsdatenbank schreiben ohne Prüfschritt.
+5. **Protokoll erzeugen** — Jede Pipeline-Ausführung gibt Statistik aus: Zeilen ein/aus, Fehler, Duplikate.
+
+### Polars vs. Pandas — Entscheidung
+
+| Kriterium | Polars | Pandas |
+|---|---|---|
+| Datenmenge | > 100.000 Zeilen oder > 50 MB | < 100.000 Zeilen, kleine Dateien |
+| SQL-ähnliche Abfragen | `execute_polars_sql` — nativ | Umweg über `query()` |
+| Speichereffizienz | Arrow-basiert, deutlich geringer | Höherer Speicherbedarf |
+| Ecosystem / Bibliotheken | Wachsend, modern | Sehr breit (sklearn, seaborn...) |
+| **Standard** | **Bevorzugen** | Nur bei Ecosystem-Zwang |
+
+Ressource für alle 4 Phasen: `resources/csv_etl_pipeline.py` (Ladestufe 3)
 
 ---
 
@@ -84,11 +151,12 @@ Vollständige Vorlage: `resources/shell_template.sh` (Ladestufe 3)
 ## CSV-Verarbeitung — Entscheidungsbaum
 
 ```
-Ist die CSV-Operation komplex (Joins, Typen, Encoding)?
-├── Nein → Shell-Tools: awk, cut, sort, tail (kein Python nötig)
-│           Beispiele: Filtern, Spalten extrahieren, sortieren
-└── Ja   → Python: csv.DictReader / csv.DictWriter
-            Ressource: resources/csv_verarbeitung.py (Ladestufe 3)
+Handelt es sich um einen ETL-Prozess (Discovery → Schema → Bereinigung → Transform)?
+├── Ja  → resources/csv_etl_pipeline.py  (Polars, alle 4 Phasen, Ladestufe 3)
+│          + MCP-Tools für Discovery/Schema wenn Dateisystem-Zugriff nötig
+└── Nein → Einfache Operation?
+           ├── Nein → resources/csv_verarbeitung.py  (Stdlib, Ladestufe 3)
+           └── Ja   → Shell-Tools: awk, cut, sort, tail (kein Python nötig)
 ```
 
 Shell-Kurzreferenz:
@@ -140,11 +208,12 @@ Für Prozesse: Nummerierte Schrittliste mit Entscheidungspunkten.
 
 ## Verwandte Ressourcen
 
-| Ressource | Ladestufe | Inhalt |
-|---|---|---|
-| `resources/shell_template.sh` | 3 | Vollständige sichere Bash-Vorlage |
-| `resources/csv_verarbeitung.py` | 3 | CSV lesen/schreiben/filtern (Python) |
-| `resources/excel_aufgaben.py` | 3 | Excel-Aufgabentabelle mit Farben |
-| `resources/tabellen.css` | 3 | Tabellen-Grundstil + Status-Badges |
-| `CLAUDE.md` → Docker-Sicherheit | — | Immutable Config, Volume Mounts, UID-Isolation |
-| `.claude/skills/n8n-workflow-manager/SKILL.md` | — | MCP vs. REST API Entscheidung |
+| Ressource | Ladestufe | Kategorie | Inhalt |
+|---|---|---|---|
+| `resources/csv_etl_pipeline.py` | 3 | Office-Arbeit | Polars-ETL: Discovery, Schema, Bereinigung, Transformation |
+| `resources/csv_verarbeitung.py` | 3 | Datenformate | CSV lesen/schreiben/filtern (Stdlib, einfache Ops) |
+| `resources/shell_template.sh` | 3 | Shell-Scripting | Vollständige sichere Bash-Vorlage |
+| `resources/excel_aufgaben.py` | 3 | Office-Arbeit | Excel-Aufgabentabelle mit Status-Farben |
+| `resources/tabellen.css` | 3 | Datenformate | Tabellen-Grundstil + Status-Badges (BEM) |
+| `CLAUDE.md` → Docker-Sicherheit | — | — | Immutable Config, Volume Mounts, UID-Isolation |
+| `.claude/skills/n8n-workflow-manager/SKILL.md` | — | — | MCP vs. REST API Entscheidung |
