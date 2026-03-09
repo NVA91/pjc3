@@ -16,6 +16,10 @@ categories:
     description: >
       Datenadministration, ETL-Pipelines, Data Warehousing,
       Excel-Finanzmodellierung, Analyse und Visualisierung
+  - name: Vision
+    description: >
+      Bildbeschreibung, Dokumentenextraktion (Rechnungen/Quittungen),
+      Diagramm-Analyse, Screenshot-Auswertung, Batch-Verarbeitung
   - name: Shell-Scripting
     description: Sichere, wiederholbare Bash/Zsh-Automatisierungen
   - name: Datenformate
@@ -43,6 +47,15 @@ triggers:
   - Finanzmodellierungs-Konventionen anwenden (blaue/schwarze Schrift)
   - Zirkelbezüge (#REF!, #VALUE!) in Excel debuggen und korrigieren
   - Excel-Datei mit LibreOffice headless verifizieren
+  # Vision / Bildbeschreibung / Dokumentenanalyse
+  - Bild beschreiben oder kontextuell interpretieren (Vision)
+  - Rechnung, Quittung oder Lieferschein aus Bild/Scan extrahieren
+  - Balken-, Linien- oder Kreisdiagramm aus Screenshot analysieren
+  - UI-Screenshot oder Fehlermeldung strukturiert beschreiben
+  - Mehrere Bilder oder Dokumente als Batch verarbeiten
+  - Visuelle Informationen in JSON oder Markdown überführen
+  - OCR-ähnliche Extraktion aus analogen Dokumenten durchführen
+  - Automatisierte Reporting-Workflows mit Bildinput aufbauen
   # Shell-Scripting
   - Shell-Skripte erstellen, prüfen oder überarbeiten
   - Bash- oder Zsh-Automatisierungen entwickeln
@@ -54,6 +67,7 @@ triggers:
 resources:
   - resources/csv_etl_pipeline.py
   - resources/excel_finanzmodell.py
+  - resources/vision_dokument.py
   - resources/shell_template.sh
   - resources/csv_verarbeitung.py
   - resources/excel_aufgaben.py
@@ -203,6 +217,98 @@ eine Annahme (z. B. Wachstumsrate in B11), berechnet Excel das gesamte Modell ne
 
 ---
 
+## Vision: Bildbeschreibung und visuelle Dokumentenanalyse
+
+Das Modell nähert sich Bildern nicht über einfache OCR oder Objekterkennung, sondern über
+denselben Reasoning-Apparat wie bei Text: Achsenbeschriftungen werden gelesen, Relationen
+zwischen Datenpunkten korreliert, strategische Bedeutung im Geschäftskontext interpretiert.
+
+### Anwendungsfälle und Ausgabeformate
+
+| Anwendungsfall | Input | Ausgabeformat | Ressource |
+|---|---|---|---|
+| **Allgemeine Bildbeschreibung** | Beliebiges Bild (PNG/JPG/WebP) | Markdown-Prose | `vision_dokument.py beschreiben` |
+| **Rechnungs-/Quittungsextraktion** | Scan, Foto, PDF-Screenshot | JSON (strukturiert) | `vision_dokument.py rechnung` |
+| **Diagramm-Analyse** | Chart-Screenshot (Balken/Linie/Kreis) | JSON + Interpretation | `vision_dokument.py diagramm` |
+| **UI-Screenshot / Fehleranalyse** | Browser/App-Screenshot | Markdown strukturiert | `vision_dokument.py screenshot` |
+| **Batch-Verarbeitung** | Verzeichnis mit Bildern | JSON-Lines (1 Datei = 1 Zeile) | `vision_dokument.py batch` |
+
+### Architektur-Prinzip
+
+```
+Bild-Input (lokal / URL)
+    ↓
+Claude Vision API (claude-sonnet-4-6, base64 oder URL)
+    ↓  kontextuelle Interpretation (kein simple OCR)
+Strukturierter Output (JSON / Markdown)
+    ↓
+Downstream: ETL-Pipeline | Excel-Modell | Datenbank-Skill | Report
+```
+
+### Rechnungsextraktion — JSON-Schema (Standard)
+
+```json
+{
+  "dokument_typ": "rechnung | quittung | lieferschein | unbekannt",
+  "rechnungsnummer": "...",
+  "datum": "YYYY-MM-DD",
+  "faellig_am": "YYYY-MM-DD | null",
+  "lieferant": { "name": "...", "adresse": "...", "ust_id": "..." },
+  "empfaenger": { "name": "...", "adresse": "..." },
+  "positionen": [
+    { "beschreibung": "...", "menge": 0, "einheit": "...",
+      "einzelpreis": 0.0, "gesamtpreis": 0.0, "mwst_satz": 0.19 }
+  ],
+  "zwischensumme": 0.0,
+  "mwst_betrag": 0.0,
+  "gesamtbetrag": 0.0,
+  "waehrung": "EUR",
+  "konfidenz": 0.0,
+  "anmerkungen": "..."
+}
+```
+
+### Diagramm-Analyse — Ausgabestruktur
+
+```json
+{
+  "diagramm_typ": "balken | linie | kreis | streuung | tabelle | unbekannt",
+  "titel": "...",
+  "x_achse": { "bezeichnung": "...", "einheit": "..." },
+  "y_achse": { "bezeichnung": "...", "einheit": "..." },
+  "datenpunkte": [{ "label": "...", "wert": 0.0 }],
+  "trend": "steigend | fallend | stabil | gemischt",
+  "interpretation": "Kontextuelle Bedeutung in 2-3 Sätzen",
+  "handlungsempfehlung": "..."
+}
+```
+
+### Pflicht-Ablauf für jeden Vision-Job
+
+1. **Bildpfad bestätigen** — Pfad dem Nutzer anzeigen; kein autonomes Scannen ohne Freigabe.
+2. **Modus wählen** — `rechnung` / `diagramm` / `screenshot` / `beschreiben` / `batch`.
+3. **API-Key prüfen** — `ANTHROPIC_API_KEY` muss gesetzt sein (kein `load_dotenv()` in Ressource).
+4. **Output nach stdout** — JSON oder Markdown; kein direktes Schreiben in Drittsysteme.
+5. **Konfidenz kommunizieren** — Bei niedriger Konfidenz (`< 0.7`) Nutzer zur manuellen Prüfung auffordern.
+
+### Batch-Verarbeitung — Übergabe an ETL-Pipeline
+
+```
+Verzeichnis mit Bildern
+    → vision_dokument.py batch (JSON-Lines nach stdout)
+    → Pipe zu csv_etl_pipeline.py transformieren
+    → Konsolidierter Datensatz für DB-Einlagerung
+```
+
+```bash
+# Beispiel-Verkettung (Rechnungen batch → ETL → Excel)
+python vision_dokument.py batch ./rechnungen/ rechnung \
+  | python csv_etl_pipeline.py transformieren - "SELECT * FROM df WHERE konfidenz > 0.8" \
+  > rechnungen_verifiziert.csv
+```
+
+---
+
 ## Sicherheitsregeln — niemals verletzen
 
 - **Kein Dateizugriff ohne Freigabe**: Keine Datei öffnen, lesen oder schreiben ohne explizite Nutzererlaubnis.
@@ -297,6 +403,7 @@ Für Prozesse: Nummerierte Schrittliste mit Entscheidungspunkten.
 |---|---|---|---|
 | `resources/csv_etl_pipeline.py` | 3 | Office-Arbeit | Polars-ETL: Discovery, Schema, Bereinigung, Transformation, Data Warehousing |
 | `resources/excel_finanzmodell.py` | 3 | Office-Arbeit | 3-Statement-Modell, SaaS-Metriken, Szenario-Analyse, Formelinjektion, Verifikation |
+| `resources/vision_dokument.py` | 3 | Vision | Claude Vision API: Rechnung/Diagramm/Screenshot/Batch → JSON oder Markdown |
 | `resources/csv_verarbeitung.py` | 3 | Datenformate | CSV lesen/schreiben/filtern (Stdlib, einfache Ops) |
 | `resources/shell_template.sh` | 3 | Shell-Scripting | Vollständige sichere Bash-Vorlage |
 | `resources/excel_aufgaben.py` | 3 | Office-Arbeit | Excel-Aufgabentabelle mit Status-Farben (einfach) |
