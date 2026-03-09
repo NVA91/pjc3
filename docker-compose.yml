@@ -11,7 +11,10 @@
 
 services:
   app:
-    image: ${SERVICE_IMAGE}
+    image: ${SERVICE_IMAGE:-pjc3-python:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
 
     # Non-Root User Mapping:
     # Container läuft als Agent-spezifischer System-User, nicht als root.
@@ -80,6 +83,8 @@ services:
       - "agent.namespace=${AGENT_NAMESPACE}"
       - "project.name=${COMPOSE_PROJECT_NAME}"
       - "agent.uid=${AGENT_UID}"
+
+    command: ["sleep", "infinity"]
 
 # Named Volumes: vollständiger Namespace-Präfix verhindert Kollisionen
 # Format: <AGENT_NAMESPACE>-<COMPOSE_PROJECT_NAME>-vol-<zweck>
