@@ -27,7 +27,7 @@ define log_action
 		tee -a $(LOG_DIR)/audit.log
 endef
 
-.PHONY: up down ps logs validate
+.PHONY: up down ps logs validate guard
 
 ## validate — Prüft, ob AGENT_NAMESPACE korrekt gesetzt ist
 validate:
@@ -62,3 +62,13 @@ logs: validate
 	docker compose -p $(COMPOSE_PROJ) logs -f --tail=100 2>&1 | \
 		jq -R -c --arg agent "$(AGENT_NS)" --arg project "$(COMPOSE_PROJ)" \
 		'{timestamp: now|todate, agent: $$agent, project: $$project, message: .}'
+
+## guard — Führt nur streng validierte read-only Host-Befehle im Projekt aus
+## Beispiel: make guard CMD='grep TODO ./README.md'
+guard:
+	@if [ -z "$(CMD)" ]; then \
+		echo "❌ CMD fehlt"; \
+		echo "Beispiel: make guard CMD='ls -la ./docs'"; \
+		exit 1; \
+	fi
+	bash safe-project-exec.sh $(CMD)

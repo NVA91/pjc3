@@ -29,6 +29,24 @@ AGENT_NAMESPACE=CLAUDE AGENT_UID=1001 AGENT_GID=1001 COMPOSE_PROJECT_NAME=pjc003
 AGENT_NAMESPACE=CLAUDE AGENT_UID=1001 AGENT_GID=1001 COMPOSE_PROJECT_NAME=pjc003 docker compose down
 ```
 
+## Harte Guard-Regeln (Host)
+
+Für sichere, projektisolierte Host-Befehle nutze den Guard:
+
+```bash
+make guard CMD='ls -la ./docs'
+make guard CMD='cat ./README.md'
+make guard CMD='grep TODO ./README.md'
+```
+
+Der Guard in `safe-project-exec.sh` erzwingt:
+
+- Nur read-only Whitelist-Befehle (`ls`, `cat`, `head`, `tail`, `grep`, `awk`, `sed`)
+- Kein Path-Hopping (`..` ist verboten)
+- Keine Shell-Operatoren/Chaining (`;`, `&&`, `||`, `|`, `>`, `<`, `$()`, Backticks)
+- `grep` nur auf expliziten Dateien (kein `-r`, `-R`, `--recursive`, kein `.`/`/` als Ziel)
+- Zugriff nur innerhalb dieses Projekts (`pjc3`)
+
 ## Enthaltene Container-Dateien
 
 - `Dockerfile` (Python 3.12 slim, installiert `requirements.txt`)
