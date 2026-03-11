@@ -129,6 +129,27 @@ ANTHROPIC_API_KEY=sk-ant-api03-...
 
 ---
 
+## Pre-Flight Master-Skill (Phase 1)
+
+- **Skill-Pfad**: `.claude/skills/code-helper/SKILL.md`
+- **Router-Prompt**: `.claude/skills/code-helper/00-router.md`
+- **Pflichtablauf bei jeder neuen Aufgabe**:
+  1. Intent-Routing ausführen
+  2. Erste sichtbare Zeile als Intent-Label ausgeben (z. B. `[Intent: write_code]`)
+  3. Bei strategischen/architektonischen Fragen zuerst `NOVA_ROADMAP.md` berücksichtigen
+  4. Erst danach Implementierung oder Tool-Ausführung starten
+
+- **Intent-Schema**:
+  - `[Intent: write_code]`
+  - `[Intent: debug]`
+  - `[Intent: review]`
+  - `[Intent: architecture]`
+  - `[Intent: docs]`
+  - `[Intent: explain]`
+  - `[Intent: ops]`
+
+---
+
 ## Git-Workflow
 
 ```bash
