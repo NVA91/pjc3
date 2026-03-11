@@ -44,7 +44,8 @@ Der Guard in `safe-project-exec.sh` erzwingt:
 - Nur read-only Whitelist-Befehle (`ls`, `cat`, `head`, `tail`, `grep`, `awk`, `sed`)
 - Kein Path-Hopping (`..` ist verboten)
 - Keine Shell-Operatoren/Chaining (`;`, `&&`, `||`, `|`, `>`, `<`, `$()`, Backticks)
-- `grep` nur auf expliziten Dateien (kein `-r`, `-R`, `--recursive`, kein `.`/`/` als Ziel)
+- `grep` nur mit expliziter Flag-Allowlist (`-i`, `-n`, `-c`, `-v`, `-w`, `-x`, `-e`) und nur auf expliziten Dateien (kein `-r`, `-R`, `--recursive`, kein `.`/`/` als Ziel)
+- `awk`/`sed`: Blockiert `-f`, `--file` und `-F` (Schutz gegen Flag-Semantik-/Code-File-Missbrauch)
 - Zugriff nur innerhalb dieses Projekts (`pjc3`)
 
 ## Enthaltene Container-Dateien

@@ -65,10 +65,19 @@ logs: validate
 
 ## guard — Führt nur streng validierte read-only Host-Befehle im Projekt aus
 ## Beispiel: make guard CMD='grep TODO ./README.md'
+##
+## SICHERHEIT (Make-Ebene):
+##   $(value CMD) gibt den CMD-Wert literal zurück, ohne ihn als Make-Funktion
+##   auszuwerten — verhindert $(shell ...)-Injection auf Make-Ebene (VULN-001).
+##
+## HINWEIS (Shell-Ebene):
+##   Der Shell-Interpreter expandiert $(...) im CMD-Wert VOR dem Script-Aufruf.
+##   CMD deshalb ausschliesslich aus vertrauenswuerdiger Quelle setzen.
+##   Direktaufruf ohne Makefile: bash safe-project-exec.sh <cmd> [args...]
 guard:
 	@if [ -z "$(CMD)" ]; then \
 		echo "❌ CMD fehlt"; \
 		echo "Beispiel: make guard CMD='ls -la ./docs'"; \
 		exit 1; \
 	fi
-	bash safe-project-exec.sh $(CMD)
+	bash safe-project-exec.sh $(value CMD)

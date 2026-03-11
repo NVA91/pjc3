@@ -166,6 +166,35 @@ validate_awk_or_sed() {
         fail "$cmd benötigt ein Skript und mindestens eine Datei"
     fi
 
+    # Programm-String (index 0) auf gefährliche Befehle prüfen.
+    # sed: e (execute), r/R (read file), w/W (write file) ermöglichen RCE bzw. Path-Bypass.
+    # awk: system(), getline, cmd|getline ermöglichen RCE bzw. beliebige Datei-Lese.
+    local program_string="${file_candidates[0]}"
+    if [[ "$cmd" == "sed" ]]; then
+        # Python-Validator: entfernt s/.../.../ und /regex/-Adress-Tokens, prüft dann
+        # ob gefährliche Befehle e(xecute), r/R(ead), w/W(rite) im Rest verbleiben.
+        # Bash-Regex reicht hier nicht aus (schlägt fehl bei Adressen wie "1e cmd").
+        local _sed_check
+        _sed_check=$(python3 -c "
+import sys, re
+prog = sys.stdin.read().rstrip()
+cleaned = re.sub(r's/[^/]*/[^/]*/[gGpPiImMqQ]*', '', prog)
+cleaned = re.sub(r'/[^/]*/', '', cleaned)
+print('SAFE' if not re.search('[eErRwW]', cleaned) else 'UNSAFE')
+" <<< "$program_string" 2>/dev/null)
+        if [[ "$_sed_check" != "SAFE" ]]; then
+            fail "sed: Gefährliche Befehle (e/r/R/w/W) im Programm-String verboten"
+        fi
+    fi
+    if [[ "$cmd" == "awk" ]]; then
+        if [[ "$program_string" =~ system[[:space:]]*\( ]] || \
+           [[ "$program_string" =~ getline ]] || \
+           [[ "$program_string" =~ \|[[:space:]]*\"  ]] || \
+           [[ "$program_string" =~ \"[[:space:]]*\| ]]; then
+            fail "awk: Gefährliche Funktionen (system/getline/pipe) im Programm-String verboten"
+        fi
+    fi
+
     local index=0
     for arg in "${file_candidates[@]}"; do
         if [[ "$index" -eq 0 ]]; then

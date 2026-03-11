@@ -27,6 +27,7 @@ pjc3/
 ├── docker-compose.yml         # Container-Konfiguration mit Sicherheits-Policies
 ├── Makefile                   # Namespace-isolierte Docker-Operationen (AGENT_NAMESPACE)
 ├── safe-container-exec.sh     # Wrapper gegen Directory Traversal in Containern
+├── safe-project-exec.sh       # Host-Guard: Whitelist read-only Befehle (ls/cat/grep/awk/sed/head/tail)
 ├── setup-agent-isolation.sh   # Einmalig als root: erstellt UID-isolierte Agent-User
 ├── requirements.txt           # Python-Abhängigkeiten
 ├── .gitignore                 # venv/, .env, __pycache__, *.pyc ausgeschlossen
@@ -68,6 +69,12 @@ pjc3/
 - Wichtige Regel: user und assistant müssen sich abwechseln
 - Modell: `claude-haiku-4-5-20251001`
 
+#### `safe-project-exec.sh` — Host-Guard (read-only Whitelist)
+- Erlaubte Befehle: `ls`, `cat`, `head`, `tail`, `grep`, `awk`, `sed`
+- Blockiert: Path Traversal (`..`), Shell-Operatoren, rekursives grep, `-f`-Flag bei grep/awk/sed
+- Aufruf via Makefile: `make guard CMD='cat ./README.md'`
+- grep-Flags: Allowlist (`-i -n -c -v -w -x -e`) — keine Denylist (Sicherheitsprinzip)
+
 ---
 
 ## Befehle
@@ -78,6 +85,11 @@ source venv/bin/activate
 
 # API-Key setzen (falls kein load_dotenv)
 export ANTHROPIC_API_KEY=sk-ant-...
+
+# Host-Guard (read-only Projektbefehle)
+make guard CMD='ls -la ./docs'
+make guard CMD='cat ./README.md'
+make guard CMD='grep TODO ./README.md'
 
 # Skripte starten
 python nova_claude.py        # Streaming-Chatbot
@@ -137,11 +149,18 @@ Commit-History (Konvention aus bisherigen Commits):
 
 ## MCP-Server (verfügbar)
 
-| Name | URL / Command | Zweck |
-|------|---------------|-------|
-| n8n | `https://n8n.novachris.de/mcp-server/http` | Automation, Telegram, PDF |
-| filesystem | `@modelcontextprotocol/server-filesystem` | Lokale Dateien |
-| memory | `@modelcontextprotocol/server-memory` | Session-Persistenz |
+| Name | Typ | Quelle | Zweck |
+|------|-----|--------|-------|
+| memory | stdio (`~/.claude.json`) | `@modelcontextprotocol/server-memory` | Session-Persistenz |
+| deepwiki | HTTP (`~/.claude.json`) | `https://mcp.deepwiki.com/mcp` | GitHub-Repo-Doku |
+| context7 | Plugin | `@upstash/context7-mcp` | Bibliotheks-Dokumentation |
+| n8n | Plugin (HTTP) | `https://n8n.novachris.de/mcp-server/http` | Automation, Telegram, PDF |
+| Notion | Plugin | via claude-plugins-official | Notion-Integration |
+
+### MCP Diagnose-Befehle
+- MCP-Konfiguration: `cat ~/.claude.json | python3 -c "import sys,json; [print(k) for k in json.load(sys.stdin).get('mcpServers',{})]"`
+- Laufende Prozesse: `ps aux | grep mcp | grep -v grep`
+- `claude mcp list` — gibt oft kein Output, nicht zuverlässig
 
 Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-manager/SKILL.md`
 
@@ -387,6 +406,12 @@ AGENT_NAMESPACE=myagent make logs
 ### Wichtige Regel für AI-Assistenten
 **Niemals** `docker compose down`, `docker compose stop` oder `docker compose rm` ohne `-p`-Flag
 in diesem Repository ausführen. Immer das `Makefile` nutzen oder explizit `-p <compose-project>` angeben.
+
+---
+
+## Security
+
+- **sec-guard** härtet ab sofort automatisch alle Skripte: Argument Injection (Flag-Allowlist), Command Injection (Array-Form statt shell=True) und Path Traversal (realpath + Base-Check) — kein manueller Aufwand.
 
 ---
 
