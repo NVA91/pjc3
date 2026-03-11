@@ -11,6 +11,7 @@ set -euo pipefail
 
 readonly PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly ALLOWED_COMMANDS=("ls" "cat" "head" "tail" "grep" "awk" "sed")
+readonly ALLOWED_GREP_FLAGS=("-i" "-n" "-c" "-v" "-w" "-x" "-e")
 
 fail() {
     echo "❌ $1" >&2
@@ -47,6 +48,17 @@ is_allowed_command() {
 
 is_flag() {
     [[ "$1" == -* ]]
+}
+
+is_allowed_grep_flag() {
+    local candidate="$1"
+    local allowed
+    for allowed in "${ALLOWED_GREP_FLAGS[@]}"; do
+        if [[ "$candidate" == "$allowed" ]]; then
+            return 0
+        fi
+    done
+    return 1
 }
 
 normalize_path() {
@@ -133,6 +145,16 @@ validate_awk_or_sed() {
     local file_candidates=()
 
     for arg in "$@"; do
+        # Sicherheitsaspekt: -f/--file lädt externen Code aus Datei.
+        # Zusätzlich blocken wir -F, weil Flag-Semantik je Tool variieren kann
+        # und diese Option in Reports als Missbrauchspfad markiert wurde.
+        if [[ "$arg" == "-f" || "$arg" == "--file" || "$arg" == "-F" ]]; then
+            fail "$cmd: Flag $arg ist nicht erlaubt (verhindert File-as-Program)"
+        fi
+        if [[ "$arg" == -f* || "$arg" == -F* || "$arg" == --file=* ]]; then
+            fail "$cmd: Flag $arg ist nicht erlaubt (verhindert File-as-Program)"
+        fi
+
         if is_flag "$arg"; then
             continue
         fi
@@ -167,6 +189,9 @@ validate_grep() {
             fail "Weite/rekursive grep-Suche ist verboten ($arg)"
         fi
         if is_flag "$arg"; then
+            if ! is_allowed_grep_flag "$arg"; then
+                fail "grep-Flag nicht erlaubt: $arg"
+            fi
             continue
         fi
         non_flag_count=$((non_flag_count + 1))
