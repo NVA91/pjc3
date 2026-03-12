@@ -5,6 +5,13 @@ Claude API Lernprojekt — Experimente mit dem Anthropic Python SDK: Chatbots, T
 
 ---
 
+## Umgebungshinweise
+
+- `venv/` existiert **nicht** im Projektordner — `python3` direkt nutzen (kein `source venv/bin/activate`)
+- Pyright `reportMissingImports` für `mcp.server.fastmcp` ist ein Falsch-Alarm (Paket systemweit installiert)
+
+---
+
 ## Techstack
 - **Python** + venv (`./venv/`) — aktivieren: `source venv/bin/activate`
 - **Abhängigkeiten** (`requirements.txt`): `anthropic`, `jupyter`, `python-dotenv`
@@ -29,6 +36,11 @@ pjc3/
 ├── safe-container-exec.sh     # Wrapper gegen Directory Traversal in Containern
 ├── safe-project-exec.sh       # Host-Guard: Whitelist read-only Befehle (ls/cat/grep/awk/sed/head/tail)
 ├── setup-agent-isolation.sh   # Einmalig als root: erstellt UID-isolierte Agent-User
+├── radar.py                   # System-Radar: Docker + Prozesse → Mermaid-Flowchart
+├── mcp_gateway.py             # FastMCP ETL-Controller (ruft radar.py + extractor.py)
+├── extractor.py               # Dummy-Extraktor (--profile Pfad zur JSON-Datei)
+├── profiles/                  # ETL-Profile, z.B. legal.json → {"mode":..., "target":...}
+├── SYSTEM_VISUALIZATION.md    # Generierte Datei — nicht committen (.gitignore)
 ├── requirements.txt           # Python-Abhängigkeiten
 ├── .gitignore                 # venv/, .env, __pycache__, *.pyc ausgeschlossen
 └── CLAUDE.md                  # Diese Datei
@@ -182,6 +194,11 @@ Commit-History (Konvention aus bisherigen Commits):
 - MCP-Konfiguration: `cat ~/.claude.json | python3 -c "import sys,json; [print(k) for k in json.load(sys.stdin).get('mcpServers',{})]"`
 - Laufende Prozesse: `ps aux | grep mcp | grep -v grep`
 - `claude mcp list` — gibt oft kein Output, nicht zuverlässig
+
+### MCP ETL Controller
+- Tool: `starte_extraktion(profil_name)` — startet `radar.py` → `extractor.py` → `radar.py`
+- `radar.run(label)` direkt aufrufbar; CLI: `python3 radar.py --label "Zustand"`
+- Profile in `profiles/<name>.json`; `SYSTEM_VISUALIZATION.md` wird bei jedem Aufruf überschrieben
 
 Skill-Entscheidung: MCP vs. REST API → siehe `@.claude/skills/n8n-workflow-manager/SKILL.md`
 
@@ -433,6 +450,28 @@ in diesem Repository ausführen. Immer das `Makefile` nutzen oder explizit `-p <
 ## Security
 
 - **sec-guard** härtet ab sofort automatisch alle Skripte: Argument Injection (Flag-Allowlist), Command Injection (Array-Form statt shell=True) und Path Traversal (realpath + Base-Check) — kein manueller Aufwand.
+
+### Regel: Isolierte Umgebung ist Pflicht
+
+Jeder Subprozess, der aus einem MCP-Server oder Skript gestartet wird, **muss dieselbe isolierte Umgebung (venv) verwenden** wie der aufrufende Prozess.
+
+**Niemals:**
+```python
+subprocess.run(["python", "skript.py"])   # ❌ System-Python — falsche Umgebung
+```
+
+**Immer:**
+```python
+import sys
+subprocess.run([sys.executable, "skript.py"])   # ✅ sys.executable = gleiche venv
+```
+
+**Warum:** `"python"` zeigt auf das System-Python. Fehlt dort eine Bibliothek (z.B. `pandas`, `pdfplumber`), schlägt der Prozess still fehl — auch wenn die venv alle Pakete enthält. `sys.executable` erbt automatisch die aktive Umgebung des aufrufenden Prozesses.
+
+**Gilt für:**
+- `subprocess.run` / `subprocess.Popen` in MCP-Servern
+- alle Skripte, die weitere Python-Prozesse spawnen
+- Makefile-Targets, die Python aufrufen (dort: `$(VENV)/bin/python` statt `python`)
 
 ---
 
