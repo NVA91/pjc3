@@ -100,11 +100,43 @@ services:
       - "agent.namespace=${AGENT_NAMESPACE}"
       - "project.name=${COMPOSE_PROJECT_NAME}"
       - "agent.uid=${AGENT_UID}"
+      # Monitoring Labels — für zentralen Prometheus (Phase 2)
+      # Hinweis: monitoring.scrape=false setzen für CLI-Only-Container
+      # (kein HTTP-Endpoint → sonst permanente Scrape-Fehler in Prometheus)
+      - "monitoring.scrape=true"
+      - "monitoring.port=${AGENT_PORT:-8000}"
+
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
     networks:
       - agent-net
 
     command: ["sleep", "infinity"]
+
+    # EXTEND: Healthcheck einkommentieren passend zum Agent-Typ.
+    # start_period bei Bedarf erhöhen (z.B. 30s für Agents mit API-Warmup).
+    #
+    # Variante A: HTTP-Prozess (z.B. mcp_gateway.py mit FastMCP-Endpoint)
+    # Vorbedingung: AGENT_PORT muss gesetzt sein und /health-Endpunkt existieren.
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:${AGENT_PORT:-8000}/health"]
+    #   interval: 30s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 10s
+    #
+    # Variante B: CLI-Prozess (z.B. nova_claude.py, chatbot.py)
+    # Vorbedingung: Agent muss /app/tmp/agent.lock aktuell halten.
+    # healthcheck:
+    #   test: ["CMD", "sh", "-c", "test -f /app/tmp/agent.lock"]
+    #   interval: 30s
+    #   timeout: 5s
+    #   retries: 3
+    #   start_period: 10s
 
 # Named Volumes: vollständiger Namespace-Präfix verhindert Kollisionen
 # Format: <AGENT_NAMESPACE>-<COMPOSE_PROJECT_NAME>-vol-<zweck>
