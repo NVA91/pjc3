@@ -121,8 +121,14 @@ execute_safe_command() {
 
     # ── Schritt 3: Absoluten Pfad außerhalb /app blockieren ─────────────────
     # Verhindert direkten Zugriff auf /etc, /root, /proc etc. im Container
-    if [[ "$command" =~ (^|[[:space:]])/(?!app/) ]]; then
-        fail "Absoluter Pfad außerhalb von /app nicht erlaubt"
+    # Zwei-Schritt-Prüfung: Bash POSIX ERE unterstützt keine Negative Lookaheads.
+    # (?!app/) würde still ignoriert — daher explizite Entkopplung der Logik.
+    if [[ "$command" =~ (^|[[:space:]])/ ]]; then
+        if [[ ! "$command" =~ (^|[[:space:]])/app/ ]]; then
+            echo "❌ Sicherheitsverstoß: Absolute Pfade außerhalb von /app/ sind verboten."
+            echo "🚨 Blockiert: $command"
+            exit 1
+        fi
     fi
 
     # ── Schritt 4: Befehl im isolierten Container-Kontext ausführen ─────────
