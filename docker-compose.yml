@@ -101,6 +101,9 @@ services:
       - "project.name=${COMPOSE_PROJECT_NAME}"
       - "agent.uid=${AGENT_UID}"
 
+    networks:
+      - agent-net
+
     command: ["sleep", "infinity"]
 
 # Named Volumes: vollständiger Namespace-Präfix verhindert Kollisionen
@@ -109,3 +112,15 @@ volumes:
   app-cache:
     name: "${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-vol-cache"
     driver: local
+
+networks:
+  agent-net:
+    internal: true
+    name: "${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-net"
+    # internal: true — kein Outbound-Traffic aus dem Container
+    # Jeder Namespace bekommt sein eigenes Netz (Naming verhindert Kollisionen)
+    #
+    # EXTEND: Für Phase 2 (Prometheus-Scraping) zweites Netz ergänzen:
+    # monitoring-net:
+    #   internal: true
+    #   name: "${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-monitoring-net"
