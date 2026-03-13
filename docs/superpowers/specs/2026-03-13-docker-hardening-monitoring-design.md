@@ -21,8 +21,19 @@ Kein cAdvisor — zentraler Prometheus liest bereits via `host.docker.internal:9
 - `no-new-privileges: true`
 - Read-only Mounts für `./config` und `./secrets`
 - `rprivate` Propagation auf allen Bind-Mounts
-- Named Volumes mit Namespace-Präfix
+- Named Volumes mit Namespace-Präfix (Format: `"${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-vol-<zweck>"`)
 - `tmpfs` für `/app/tmp`
+
+Named Volume YAML (unverändert, muss erhalten bleiben):
+```yaml
+volumes:
+  app-cache:
+    name: "${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-vol-cache"
+    driver: local
+```
+
+**Achtung `make down`:** Das Makefile nutzt `--volumes` — das löscht Named Volumes beim Herunterfahren.
+Für persistente Daten `make down` ohne `--volumes` verwenden oder Volume vor `down` sichern.
 
 ---
 
@@ -56,11 +67,11 @@ Monitoring (extern, kein Sidecar):
 
 ## Neue Env-Variablen
 
-| Variable | Zweck | Default |
-|----------|-------|---------|
-| `AGENT_MEM_LIMIT` | RAM-Limit pro Container | `512m` |
-| `AGENT_CPU_LIMIT` | CPU-Limit (Anteile) | `0.5` |
-| `AGENT_PORT` | Port für Healthcheck Variante A | `8000` |
+| Variable | Zweck | Default | Vorbedingung |
+|----------|-------|---------|--------------|
+| `AGENT_MEM_LIMIT` | RAM-Limit pro Container | `512m` | immer aktiv |
+| `AGENT_CPU_LIMIT` | CPU-Limit (Anteile) | `0.5` | immer aktiv |
+| `AGENT_PORT` | Port für Healthcheck Variante A + Monitoring-Label | `8000` | nur relevant wenn HTTP-Endpoint aktiv |
 
 Bestehende Env-Variablen bleiben unverändert: `AGENT_NAMESPACE`, `AGENT_UID`, `AGENT_GID`, `SERVICE_IMAGE`, `COMPOSE_PROJECT_NAME`.
 
@@ -84,6 +95,10 @@ cap_drop:
 read_only: true
 # tmpfs bereits vorhanden (/app/tmp) — deckt temporäre Schreibzugriffe ab
 ```
+
+**Hinweis:** `read_only: true` auf Service-Ebene macht das Root-Filesystem unveränderlich,
+überschreibt aber **nicht** die Schreibrechte von Bind-Mounts. Der `./data` Bind-Mount
+(`/app/data`) bleibt weiterhin schreibbar — das ist beabsichtigt und notwendig für persistente Agent-Daten.
 
 ### Ressourcenlimits
 
@@ -131,12 +146,16 @@ labels:
   - "agent.namespace=${AGENT_NAMESPACE}"
   - "project.name=${COMPOSE_PROJECT_NAME}"
   - "agent.uid=${AGENT_UID}"
-  - "monitoring.scrape=true"
+  - "monitoring.scrape=true"         # auf false setzen bei CLI-Only-Containern (kein HTTP-Endpoint)
   - "monitoring.port=${AGENT_PORT:-8000}"
 ```
 
-Zentraler Prometheus nutzt Label-basierte Service Discovery.
 Kein cAdvisor-Sidecar — Docker-Daemon-Metriken laufen bereits über `host.docker.internal:9323`.
+
+**Wichtig:** `monitoring.scrape=true` bedeutet, dass Prometheus versucht Port `AGENT_PORT` zu scrapen.
+Für CLI-Agenten ohne HTTP-Endpoint (z.B. `chatbot.py`, `nova_claude.py`) muss `monitoring.scrape=false` gesetzt werden, um permanente Scrape-Fehler in Prometheus zu vermeiden.
+
+**Netzwerk-Topologie:** Mit `internal: true` auf `agent-net` kann Prometheus den Container-Port nur erreichen, wenn es selbst dem `agent-net` beigetreten ist. Aktuell scrapt der zentrale Prometheus **ausschließlich** Docker-Daemon-Metriken via `host.docker.internal:9323` — die `monitoring.port` Labels sind für **Phase 2** vorgesehen (wenn ein dediziertes `monitoring-net` neben `agent-net` existiert). Bis dahin: Labels setzen, scraping bleibt deaktiviert.
 
 ---
 
