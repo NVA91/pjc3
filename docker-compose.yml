@@ -21,6 +21,11 @@ services:
     # Selbst bei Container-Escape hat der Prozess nur UID/GID des Agents
     # auf dem Host — kein Zugriff auf Dateien anderer Agents oder root.
     user: "${AGENT_UID}:${AGENT_GID}"
+    read_only: true
+    # Hinweis: read_only:true macht das rootfs unveränderlich,
+    # überschreibt aber NICHT Schreibrechte von Bind-Mounts.
+    # ./data bleibt weiterhin schreibbar (beabsichtigt).
+    # Temporäre Schreibzugriffe → /app/tmp (tmpfs, bereits konfiguriert)
 
     volumes:
       # ✅ ERLAUBT: Relativer Bind-Mount — nur Projektverzeichnis, nie absolut
