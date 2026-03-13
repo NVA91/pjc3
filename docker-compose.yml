@@ -4,6 +4,9 @@
 #   AGENT_NAMESPACE=CLAUDE AGENT_UID=1001 AGENT_GID=1001 \
 #     SERVICE_IMAGE=myimage:latest make up
 #
+# Optionale Ressourcenlimits (Defaults: 512m RAM, 0.5 CPU):
+#   AGENT_MEM_LIMIT=256m AGENT_CPU_LIMIT=0.25 ... make up
+#
 # UID-Mapping (fest, nie überschneiden):
 #   CLAUDE:  1001:1001
 #   GRAVITY: 1002:1002
@@ -26,6 +29,9 @@ services:
     # überschreibt aber NICHT Schreibrechte von Bind-Mounts.
     # ./data bleibt weiterhin schreibbar (beabsichtigt).
     # Temporäre Schreibzugriffe → /app/tmp (tmpfs, bereits konfiguriert)
+
+    mem_limit: ${AGENT_MEM_LIMIT:-512m}
+    cpus: "${AGENT_CPU_LIMIT:-0.5}"
 
     volumes:
       # ✅ ERLAUBT: Relativer Bind-Mount — nur Projektverzeichnis, nie absolut
