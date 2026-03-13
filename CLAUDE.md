@@ -8,7 +8,7 @@ Claude API Lernprojekt — Experimente mit dem Anthropic Python SDK: Chatbots, T
 ## Umgebungshinweise
 
 - `venv/` existiert **nicht** im Projektordner — `python3` direkt nutzen (kein `source venv/bin/activate`)
-- Pyright `reportMissingImports` für `mcp.server.fastmcp` ist ein Falsch-Alarm (Paket systemweit installiert)
+- Pyright `reportMissingImports` für `mcp.server.fastmcp`, `dotenv`, `fastmcp` sind Falsch-Alarme (Pakete systemweit installiert)
 
 ---
 
@@ -447,6 +447,14 @@ in diesem Repository ausführen. Immer das `Makefile` nutzen oder explizit `-p <
 
 ---
 
+## Schwesterprojekt
+
+- `pjc3-docker` (`/home/ubhp-nova/claude-c/pjc3-docker/`) — Home-Infrastruktur Stack (Caddy, Pi-hole, Vaultwarden, MCP-Agent)
+- GitHub: `git@github.com:NVA91/pjc3-docker.git`
+- Pläne unter: `docs/superpowers/plans/2026-03-12-pjc3-docker-*.md`
+
+---
+
 ## Security
 
 - **sec-guard** härtet ab sofort automatisch alle Skripte: Argument Injection (Flag-Allowlist), Command Injection (Array-Form statt shell=True) und Path Traversal (realpath + Base-Check) — kein manueller Aufwand.
@@ -472,6 +480,27 @@ subprocess.run([sys.executable, "skript.py"])   # ✅ sys.executable = gleiche v
 - `subprocess.run` / `subprocess.Popen` in MCP-Servern
 - alle Skripte, die weitere Python-Prozesse spawnen
 - Makefile-Targets, die Python aufrufen (dort: `$(VENV)/bin/python` statt `python`)
+
+---
+
+## Architektur-Konventionen
+
+### Memory-Anker (Datei-Header)
+Jede neue Datei erhält einen Kommentar-Header:
+```python
+# MEMORY: dateiname.py
+# Erweiterungsäste: dateiname_erweiterung.py
+# Wenn X fehlschlägt: Y prüfen
+# Verknüpft mit: andere_datei.py → funktion()
+```
+
+### Erweiterungsäste
+Neue Funktionalität kommt in eigene Dateien (z.B. `grafana_tools_prometheus.py` statt alles in `grafana_tools.py`).
+Äste werden im Memory-Anker der Elterndatei dokumentiert — kein Code, nur Verweis.
+
+### Design-Specs
+Spec-Dokumente: `docs/superpowers/specs/YYYY-MM-DD-<thema>-design.md`
+Format: Ziel → Architektur → Dateien → Konfiguration → Claude-Verhalten → Erweiterungsäste → Out of Scope
 
 ---
 
