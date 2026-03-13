@@ -1,8 +1,12 @@
 ---
 name: code-helper
 description: >
-  Pre-Flight Master-Skill für alle neuen Aufgaben. Erzwingt zuerst Intent-Routing,
-  optionalen Roadmap-Check für Architekturentscheidungen und erst danach Ausführung.
+  This skill should be used when the user starts any new task, asks to "begin working on",
+  "classify this request", "what should we do first", or initiates any code change.
+  Enforces Intent-Routing before execution: reads 00-router.md, outputs an [Intent: ...]
+  label, optionally checks NOVA_ROADMAP.md for architecture scope, then proceeds.
+  Trigger on every new session start or first task in a conversation.
+version: "1.1"
 categories:
   - name: Routing
     description: Intent-Klassifikation, Scope-Check, Ausführungsstart
