@@ -1,0 +1,442 @@
+Notizbuch-Vorlage claud c
+
+Beschreiben Sie Ihre neue Notiz hier. pan für ausbau pc infrastrucktur 
+
+Gesamte docker-compose.yml (Mini-PC → Proxmox-ready)
+
+text
+version: "3.9"
+
+services:
+  # Reverse Proxy (Caddy)
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - home-net
+
+  # Monitoring (Prometheus + Grafana)
+  prometheus:
+    image: prom/prometheus:latest
+    restart: unless-stopped
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - home-net
+    # Kein ports → Caddy routing
+
+  grafana:
+    image: grafana/grafana:latest
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=strongpass123
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - home-net
+
+  # Einkaufsliste (dein Projekt)
+  shopping:
+    image: dein-user/einkaufsliste:latest
+    restart: unless-stopped
+    networks:
+      - home-net
+
+  # Vaultwarden
+  vaultwarden:
+    image: vaultwarden/server:latest
+    restart: unless-stopped
+    volumes:
+      - vw_data:/data
+    networks:
+      - home-net
+
+networks:
+  home-net:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
+  prometheus_data:
+  grafana_data:
+  vw_data:
+
+Caddyfile (alle Services)
+
+text
+# Monitoring
+grafana.local {
+  reverse_proxy grafana:3000
+  basicauth {
+    admin {docker run --rm caddy:2-alpine caddy hash-password --plaintext "deinpass"}
+  }
+}
+
+prometheus.local {
+  reverse_proxy prometheus:9090
+}
+
+# Dienste
+shopping.local {
+  reverse_proxy shopping:8080
+}
+
+vault.local {
+  reverse_proxy vaultwarden:80
+
+
+Auf Ubuntu Desktop (aktuell)
+
+text
+Ubuntu Desktop → Docker Compose → Caddy → grafana.local, shopping.local
+├── /home/user/docker-home/          # Dein Stack
+├── docker-compose.yml              # Identisch
+├── Caddyfile                      # Identisch  
+└── prometheus.yml                 # Identisch
+
+Auf Proxmox (zukünftig)
+
+text
+Proxmox → LXC Ubuntu 24.04 → Docker Compose → Caddy → *.local
+└── /home/docker-home/             # Gleicher Pfad!
+
+Migration (1 Befehl)
+
+bash
+# Von Ubuntu Desktop zu Proxmox LXC:
+rsync -avz --delete /home/user/docker-home/ root@PROXMOX-LXC-IP:/home/docker-home/
+ssh root@PROXMOX-LXC-IP "cd /home/docker-home && docker compose down && docker compose up -d"
+
+docker-compose.yml (final, portabel)
+
+text
+version: "3.9"
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [home-net]
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks: [home-net]
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=changeit123
+    volumes: [grafana_data:/var/lib/grafana]
+    networks: [home-net]
+
+  shopping:
+    image: dein/einkaufsliste:latest  # Dein Image
+    networks: [home-net]
+
+networks: {home-net: {driver: bridge}}
+volumes: [caddy_data, caddy_config, prometheus_data, grafana_data]
+
+UFW (identisch beide Systeme)
+
+bash
+# Ubuntu Desktop + Proxmox LXC:
+sudo ufw allow from 192.168.178.0/24 to any port 80,443 proto tcp
+sudo ufw delete allow 8080  # Alle direkten Ports schließen
+sudo ufw reload                                          prometheus.yml + Loki (Docker-Compose ready)
+prometheus.yml
+
+text
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus selbst
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Docker Container Metrics (via cAdvisor)
+  - job_name: cadvisor
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  # Node Exporter (Host Metrics)
+  - job_name: node
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # Deine Services
+  - job_name: docker
+    static_configs:
+      - targets: ['shopping:8080']
+      - targets: ['grafana:3000']
+
+Erweiterte docker-compose.yml (mit cAdvisor, Node-Exporter, Loki)
+
+text
+version: "3.9"
+services:
+  # Bestehende Services + Monitoring Stack
+  caddy:
+    image: caddy:2-alpine
+    ports: ["127.0.0.1:80:80", "127.0.0.1:443:443"]
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [home-net]
+
+  # Container Monitoring
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks: [home-net]
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+    networks: [home-net]
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks: [home-net]
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=changeit123
+    volumes: [grafana_data:/var/lib/grafana]
+    networks: [home-net]
+
+  # Loki (Logs)
+  loki:
+    image: grafana/loki:3.1.1
+    restart: unless-stopped
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks: [home-net]
+
+  # Promtail (Log-Sammler)
+  promtail:
+    image: grafana/promtail:3.1.1
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks: [home-net]
+    depends_on: [loki]
+
+networks: {home-net: {driver: bridge}}
+volumes: [caddy_data, caddy_config, prometheus_data, grafana_data]
+
+Loki Configs (minimal)
+
+loki-config.yml:
+
+text
+auth_enabled: false
+server:
+  http_listen_port: 3100
+ingester:
+  lifecycler:
+    address: 127.0.0.1
+  chunk_idle_period: 1h
+  max_chunk_age: 1h
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+storage_config:
+  boltdb_shipper:
+    active_index_directory: /tmp/loki/boltdb-shipper-active
+    cache_location: /tmp/loki/boltdb-shipper-cache
+    shared_store: filesystem
+  filesystem:
+    directory: /tmp/loki/chunks
+
+promtail-config.yml:
+
+text
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+positions:
+  filename: /tmp/positions.yaml
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+scrape_configs:
+  - job_name: containers
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+
+Caddyfile erweitern
+
+text
+grafana.local {
+  reverse_proxy grafana:3000
+  basicauth { admin $2a$14$... }  # docker run caddy:2-alpine caddy hash-password
+}
+
+loki.local {
+  reverse_proxy loki:3100
+}
+
+prometheus.local {
+  reverse_proxy prometheus:9090
+}
+
+Starten
+
+bash
+cd /home/docker-home
+docker compose up -d
+
+Zugriff:
+
+text
+https://grafana.local    # Dashboards (Prom + Loki)
+https://loki.local       # Raw Logs
+https://prometheus.local # Metrics
+docker-compose.yml Template (eigene Projekte)
+
+text
+version: "3.9"
+services:
+  # Reverse Proxy (für alle *.local)
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:80:80"
+      - "127.0.0.1:443:443"
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks: [home-net]
+
+  # DEIN PROJEKT 1
+  meinewebseite:
+    build: ./projekte/webseite1    # Oder: image: dein/image
+    restart: unless-stopped
+    volumes:
+      - ./projekte/webseite1/data:/app/data
+    environment:
+      - DB_HOST=mydb1
+    networks: [home-net]
+    depends_on:
+      - mydb1
+
+  mydb1:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASS1}
+    volumes: [webseite1_db:/var/lib/postgresql/data]
+    networks: [home-net]
+
+  # DEIN PROJEKT 2  
+  meineapp:
+    build: ./projekte/app2
+    restart: unless-stopped
+    networks: [home-net]
+    depends_on: [app2_redis]
+
+  app2_redis:
+    image: redis:7-alpine
+    networks: [home-net]
+
+networks: {home-net: {driver: bridge}}
+volumes: [caddy_data, caddy_config, webseite1_db]
+
+Caddyfile (automatisch alle Services)
+
+text
+# Deine eigenen Projekte
+meinewebseite.local {
+  reverse_proxy meinewebseite:3000
+  tls internal
+}
+
+meineapp.local {
+  reverse_proxy meineapp:8080
+}
+
+# Wildcard für neue Projekte
+*.local {
+  reverse_proxy {upstream 80}
+  tls internal
+}
+
+.env (Geheimnisse)
+
+bash
+DB_PASS1=dein_starkes_passwort123
+
+Verwendung (5 Sekunden)
+
+text
+1. Neues Projekt? → Ordner `./projekte/neuername/` + Dockerfile
+2. Service in docker-compose.yml hinzufügen
+3. Zeile in Caddyfile: `neuername.local { reverse_proxy neuername:PORT }` 
+4. docker compose up -d
+5. https://neuername.local → Fertig!
+
+Struktur
+
+text
+docker-home/
+├── docker-compose.yml
+├── Caddyfile
+├── .env
+└── projekte/
+    ├── webseite1/
+    │   ├── Dockerfile
+    │   └── data/
+    └── app2/
+        ├── Dockerfile
+        └── src/
+
+

@@ -2,6 +2,10 @@
   "folders": [
     {
       "path": "."
+    },
+    {
+      "path": "../pjc3-viz1",
+      "name": "pjc3-viz1"
     }
   ],
   "settings": {
