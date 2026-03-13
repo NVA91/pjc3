@@ -124,16 +124,24 @@ Commit-Konvention: `docs:` Dokumentation · `feat:` neue Funktionalität · kurz
 - Niemals `user: root` / `user: "0:0"` — immer UID 1001–1003
 - `security_opt: [no-new-privileges:true]` immer setzen
 - Zwei Agenten dürfen niemals die gleiche UID teilen
+- `cap_drop: [ALL]` immer setzen — auf Service-Level, nicht innerhalb `security_opt`
+- `read_only: true` auf Service-Level → rootfs unveränderlich, Bind-Mounts bleiben schreibbar (beabsichtigt)
+- Ressourcenlimits: `mem_limit: ${AGENT_MEM_LIMIT:-512m}` + `cpus: "${AGENT_CPU_LIMIT:-0.5}"`
+- Netzwerk: `internal: true` auf `agent-net` — kein Outbound-Traffic; Naming: `${AGENT_NAMESPACE}-${COMPOSE_PROJECT_NAME}-net`
 
 **Operationen:**
 - Niemals `docker compose down/stop/rm` ohne `-p`-Flag — immer `Makefile` nutzen
 - Niemals `docker compose exec` direkt — immer `safe-container-exec.sh`
+- `make down` ist **interaktiv** — fragt nach `y`, nicht automatisierbar
+- Makefile berechnet `COMPOSE_PROJ` als `${AGENT_NAMESPACE}-pjc003` (`printf '%03d'` padding, nicht `pjc3`)
+- `docker compose config --quiet` — YAML-Syntax validieren; Kommentare werden gestripped → `grep -c "EXTEND:" file` für EXTEND-Blöcke
 
 ---
 
 ## Security
 
 - **sec-guard**: Argument Injection (Flag-Allowlist), Command Injection (Array-Form), Path Traversal (realpath + Base-Check)
+- **Bash POSIX ERE**: kein Negative Lookahead (`(?!...)`) — wird still ignoriert. Zwei-Schritt-Check verwenden: erst auf `/` prüfen, dann auf `/app/` gegenchecken
 - **Subprozesse**: `sys.executable` statt `"python"` — verhindert stille Fehler durch falsches System-Python
 
 ---
@@ -155,6 +163,17 @@ Im Memory-Anker der Elterndatei dokumentiert — kein Code, nur Verweis.
 ### Design-Specs
 Pfad: `docs/superpowers/specs/YYYY-MM-DD-<thema>-design.md`
 Format: Ziel → Architektur → Dateien → Konfiguration → Claude-Verhalten → Erweiterungsäste → Out of Scope
+
+### Implementation Plans
+Pfad: `docs/superpowers/plans/YYYY-MM-DD-<thema>.md`
+
+---
+
+## Monitoring (Docker)
+
+- **cAdvisor ist kein Sidecar** — Host-Daemon; als Sidecar würde jede Instanz dieselben globalen Host-Metriken liefern
+- **Kein `/sys` / `/proc` Mount** — verletzt Volume Mount Security Rules; zentraler Prometheus liest via `host.docker.internal:9323`
+- **`monitoring.scrape=false`** für CLI-Only-Container ohne HTTP-Endpoint setzen — sonst permanente Prometheus Scrape-Fehler
 
 ---
 
