@@ -185,10 +185,10 @@ Pfad: `docs/superpowers/plans/YYYY-MM-DD-<thema>.md`
 
 ---
 
-## Schwesterprojekt
+## Satellitenrepos
 
-- `pjc3-docker` (`/home/ubhp-nova/claude-c/pjc3-docker/`) — Home-Infrastruktur Stack (Caddy, Pi-hole, Vaultwarden, MCP-Agent)
-- GitHub: `git@github.com:NVA91/pjc3-docker.git`
+- `pjc3-docker` — Home-Infrastruktur Stack · GitHub: `git@github.com:NVA91/pjc3-docker.git`
+- `pjc3-viz1` — PDF-Analyse + Streamlit · lokal only, kein Remote
 
 ---
 
@@ -197,6 +197,16 @@ Pfad: `docs/superpowers/plans/YYYY-MM-DD-<thema>.md`
 - Datei: `statusline-command.sh` (in diesem Repo, versioniert)
 - Referenz: `~/.claude/settings.json` → `statusLine.command` mit absolutem Pfad
 - Kein Symlink — direkter Pfad: `bash /home/ubhp-nova/claude-c/pjc3/statusline-command.sh`
+
+---
+
+## Agenten-Hierarchie
+
+- **Router:** `core.md` — jeder Agent liest hier zuerst (Zuständigkeiten, Ticket-Format)
+- **Verwalter:** `.claude/agents/verwalter.md` in jedem Sub-Repo — einziger Eintrittspunkt
+- **doc-agent:** `.claude/agents/doc-agent.md` — schreibt Memory, löscht Temp-Notizen nach Aufgabe
+- **Guardrail:** Cross-Repo-Writes werden vom Security-Hook geblockt — kein Bug, gewollt
+- **Memory-Präfix:** `arch_` für Hierarchie/Routing-Docs · `project_` für Repo-Status
 
 ---
 
