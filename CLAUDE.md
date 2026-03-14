@@ -4,6 +4,14 @@
 > **Direktive:** `.claude/agent-directive.md` — Hierarchie, Isolation, Zero Tolerance. Pflichtlektüre vor jeder Aktion.
 > **Regeln:** `REGEL.md` — Repo-Grenzen, Verbote, Git-Regeln.
 
+## Workflow-Pflichtregeln (vor jeder Aktion)
+
+- **Repo bestätigen:** Vor Dateiänderungen `pwd` + Top-Level-Files prüfen — nie Repo raten
+- **Plan suchen:** Bei Unklarheit zuerst `docs/`, `docs/superpowers/plans/`, `.claude/` durchsuchen, bevor Fragen gestellt werden
+- **Plan vor Code:** Niemals direkt implementieren — erst nummerierten Plan vorlegen, Bestätigung abwarten
+- **Git-Push:** Nur mit explizit bestätigter Auth (SSH-Key vorhanden?) — nie auf Verdacht pushen
+- **Subagent-Driven Development:** Erfordert existierende Plan-Datei — ohne Plan: stopp und Plan zuerst schreiben
+
 ## Zweck
 Claude API Lernprojekt — Experimente mit dem Anthropic Python SDK: Chatbots, Tool Use, Streaming, Notebooks und Skripte.
 
