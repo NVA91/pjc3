@@ -55,6 +55,7 @@ python nova_claude.py                  # Streaming-Chatbot
 python chatbot.py                      # Einfacher Chatbot
 python generate_questions.py           # stop_sequences Demo
 jupyter notebook                       # Notebooks
+python3 struktur_visualizer.py         # ASCII-Tree ~/claude-c/ → STRUKTUR.md
 ```
 
 ---
