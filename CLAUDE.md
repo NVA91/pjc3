@@ -1,5 +1,9 @@
 # CLAUDE.md — Projekt pjc3
 
+> **Router:** `core.md` — Zentraler Router. Jeder Agent liest diese Datei zuerst.
+> **Direktive:** `.claude/agent-directive.md` — Hierarchie, Isolation, Zero Tolerance. Pflichtlektüre vor jeder Aktion.
+> **Regeln:** `REGEL.md` — Repo-Grenzen, Verbote, Git-Regeln.
+
 ## Zweck
 Claude API Lernprojekt — Experimente mit dem Anthropic Python SDK: Chatbots, Tool Use, Streaming, Notebooks und Skripte.
 
