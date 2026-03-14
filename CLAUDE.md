@@ -38,6 +38,8 @@ pjc3/
 ├── safe-container-exec.sh     # Wrapper gegen Directory Traversal in Containern
 ├── safe-project-exec.sh       # Host-Guard: Whitelist read-only Befehle
 ├── setup-agent-isolation.sh   # Einmalig als root: erstellt UID-isolierte Agent-User
+├── statusline-command.sh      # Claude Code Status Line — referenziert in ~/.claude/settings.json
+├── struktur_visualizer.py     # ASCII-Tree ~/claude-c/ → STRUKTUR.md (gitignored)
 ├── docs/superpowers/specs/    # Design-Specs: YYYY-MM-DD-<thema>-design.md
 ├── SYSTEM_VISUALIZATION.md    # Generierte Datei — nicht committen (.gitignore)
 └── requirements.txt
@@ -102,6 +104,7 @@ Commit-Konvention: `docs:` Dokumentation · `feat:` neue Funktionalität · kurz
 | n8n | Automation, Telegram, PDF |
 | Notion | Notion-Integration |
 
+**Konfiguration:** `~/.claude.json` → globale MCP: Schlüssel `mcpServers` · projektspezifisch: `projects.<pfad>.mcpServers`
 **Diagnose:** `ps aux | grep mcp | grep -v grep` · `claude mcp list` (unzuverlässig)
 
 ### MCP ETL Controller
@@ -181,6 +184,14 @@ Pfad: `docs/superpowers/plans/YYYY-MM-DD-<thema>.md`
 
 - `pjc3-docker` (`/home/ubhp-nova/claude-c/pjc3-docker/`) — Home-Infrastruktur Stack (Caddy, Pi-hole, Vaultwarden, MCP-Agent)
 - GitHub: `git@github.com:NVA91/pjc3-docker.git`
+
+---
+
+## Statusline
+
+- Datei: `statusline-command.sh` (in diesem Repo, versioniert)
+- Referenz: `~/.claude/settings.json` → `statusLine.command` mit absolutem Pfad
+- Kein Symlink — direkter Pfad: `bash /home/ubhp-nova/claude-c/pjc3/statusline-command.sh`
 
 ---
 
