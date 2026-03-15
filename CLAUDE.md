@@ -8,7 +8,7 @@
 
 | Prio | Plan | Nächster Schritt |
 |------|------|-----------------|
-| 1 | `docs/superpowers/plans/2026-03-15-pyramid-core-migration.md` | Checkpoint 0→1 verifizieren → Phase 1: Aegis Core + Agenten anlegen |
+| 1 | `docs/superpowers/plans/2026-03-15-pyramid-core-migration.md` | **Nächste Session: Design-Spec schreiben** → Checkpoint 0→1 → Phase 1 |
 | 2 | `../pjc3-docker/docs/superpowers/plans/2026-03-14-stack-inbetriebnahme.md` | LAN_IP eintragen → Pre-Flight |
 
 **Fortsetzen:** `/weiter`

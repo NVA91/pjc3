@@ -81,7 +81,8 @@
 ### Checkpoint 0→1 — Test & Doku
 - [ ] **Test:** `core.md` manuell lesen — sind alle Plugins, MCPs, Skills korrekt gelistet?
 - [ ] **Test:** Inventar gegen Live-State prüfen (`~/.claude/settings.json`, `~/.claude.json`, `.claude/skills/`)
-- [ ] **Doku:** `CLAUDE.md` Abschnitt "MCP-Server" + "Befehle" mit Inventar abgleichen — Abweichungen korrigieren
+- [ ] **Bereinigung:** `github`-Plugin deinstallieren (`~/.claude/plugins/`) — installiert aber nie aktiviert, kein Bedarf
+- [ ] **Doku:** `CLAUDE.md` Abschnitt "MCP-Server" mit Inventar abgleichen — Abweichungen korrigieren
 
 ---
 
@@ -100,7 +101,10 @@
 ---
 
 ### Phase 2 — Satellit-Agenten anlegen
-- [ ] `pjc3-docker/.claude/agents/verwalter.md` — Infra-Experte
+- [ ] **Git-Entkopplung:** `pjc3-docker` Remote lösen — Verwalter startet in sauberem Zustand
+- [ ] `pjc3-docker/.claude/agents/verwalter.md` anlegen — Infra-Experte
+- [ ] Verwalter macht Einstandsbericht → `REPO-STATUS.md` generieren
+- [ ] **Git-Neuverankerung:** Remote wieder setzen (gleiche URL, neuer Kontext)
 - [ ] Jeder Agent: kennt nur sein Repo, lehnt repo-fremde Aufgaben ab
 
 > **Hinweis:** pjc3-viz1 ist TABU — kein Verwalter bis explizit freigegeben.
