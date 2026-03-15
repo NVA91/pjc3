@@ -132,6 +132,8 @@ Commit-Konvention: `docs:` Dokumentation · `feat:` neue Funktionalität · kurz
 | n8n | Automation, Telegram, PDF |
 | Notion | Notion-Integration |
 
+**Quellen:** global `~/.claude.json` → `mcpServers` (memory, deepwiki, ETL_Controller) · cloud via claude.ai connector (context7, n8n, Notion)
+**Diagnose-Reihenfolge:** zuerst `~/.claude.json` prüfen, dann claude.ai cloud — nicht verwechseln
 **Konfiguration:** `~/.claude.json` → globale MCP: Schlüssel `mcpServers` · projektspezifisch: `projects.<pfad>.mcpServers`
 **Diagnose:** `ps aux | grep mcp | grep -v grep` · `claude mcp list` (unzuverlässig)
 
@@ -230,6 +232,21 @@ Pfad: `docs/superpowers/plans/YYYY-MM-DD-<thema>.md`
 - **doc-agent:** `.claude/agents/doc-agent.md` — schreibt Memory, löscht Temp-Notizen nach Aufgabe
 - **Guardrail:** Cross-Repo-Writes werden vom Security-Hook geblockt — kein Bug, gewollt
 - **Memory-Präfix:** `arch_` für Hierarchie/Routing-Docs · `project_` für Repo-Status
+
+### Migrations-Agenten (temporär vs. dauerhaft)
+- `phase-1-agent.md` — temporär, nach Phase 1 archivieren
+- `checkpoint.md` — dauerhaft, Wartungszyklen + Verifikation Aegis Core + Verwalter
+- Verwalter in Satellit-Repos — dauerhaft, kennt nur sein Repo
+
+### Satellit-Migration — Git-Entkopplung
+Vor Verwalter-Anlage: Remote lösen → Verwalter startet sauber → `REPO-STATUS.md` generieren → Remote neu verankern
+
+---
+
+## Nach der Migration
+
+- **Cache-Bereinigung:** `~/.claude/cache/` erst nach Abschluss aller Phasen + Abschluss-Checkpoint leeren — niemals mittendrin
+- **Dauer-Tests:** Checkpoint-Agent periodisch laufen lassen — erst einrichten wenn Migration stabil
 
 ---
 
