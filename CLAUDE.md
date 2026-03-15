@@ -4,6 +4,17 @@
 > **Direktive:** `.claude/agent-directive.md` — Hierarchie, Isolation, Zero Tolerance. Pflichtlektüre vor jeder Aktion.
 > **Regeln:** `REGEL.md` — Repo-Grenzen, Verbote, Git-Regeln.
 
+## Aktive Pläne
+
+| Prio | Plan | Nächster Schritt |
+|------|------|-----------------|
+| 1 | `docs/superpowers/plans/2026-03-15-pyramid-core-migration.md` | Checkpoint 0→1 verifizieren → Phase 1: Aegis Core + Agenten anlegen |
+| 2 | `../pjc3-docker/docs/superpowers/plans/2026-03-14-stack-inbetriebnahme.md` | LAN_IP eintragen → Pre-Flight |
+
+**Fortsetzen:** `/weiter`
+
+---
+
 ## Workflow-Pflichtregeln (vor jeder Aktion)
 
 - **Repo bestätigen:** Vor Dateiänderungen `pwd` + Top-Level-Files prüfen — nie Repo raten
@@ -11,9 +22,13 @@
 - **Plan vor Code:** Niemals direkt implementieren — erst nummerierten Plan vorlegen, Bestätigung abwarten
 - **Git-Push:** Nur mit explizit bestätigter Auth (SSH-Key vorhanden?) — nie auf Verdacht pushen
 - **Subagent-Driven Development:** Erfordert existierende Plan-Datei — ohne Plan: stopp und Plan zuerst schreiben
+- **Session-Ende:** Plan-Status aktualisieren + CLAUDE.md "Aktive Pläne" prüfen — `/weiter` muss funktionieren
+- **Secrets:** Immer zuerst lesen vor Schreiben — Datei könnte bereits echten Wert enthalten
+- **pjc3-viz1:** TABU — nicht lesen, nicht anfassen, bis explizit freigegeben
+- **Reihenfolge:** Aegis Core (pjc3) → Stack (pjc3-docker) → Satellit-Agenten — niemals überspringen
 
 ## Zweck
-Claude API Lernprojekt — Experimente mit dem Anthropic Python SDK: Chatbots, Tool Use, Streaming, Notebooks und Skripte.
+Globale Steuerzentrale — Aegis Core, Skills, Plugins, Commands. Claude API Experimente (SDK, Chatbots, Tool Use, Streaming, Notebooks) laufen hier als Basis.
 
 ---
 

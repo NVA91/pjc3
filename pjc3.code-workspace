@@ -12,5 +12,10 @@
     "git.openRepositoryInParentFolders": "never",
     "git.autoRepositoryDetection": "openEditors",
     "gitlens.launchpad.enabled": false
+  },
+  "extensions": {
+    "recommendations": [
+      "github.copilot-chat"
+    ]
   }
 }
