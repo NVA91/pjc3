@@ -58,18 +58,22 @@ Eine vollständig isolierte, mehrstufige Agenten-Architektur aufbauen die:
 **Darf:**
 - Lesen (alle Repos)
 - Tasks in `langzeitgedaechnis/tasks/` anlegen
-- Agenten starten und stoppen
+- Agenten starten und stoppen — via Task Envelope + Hook-Dispatch (kein direktes Bash)
 
 **Darf nicht:**
 - Direkt Projektcode schreiben
 - Global Regeln oder Settings ändern
+- Bash direkt ausführen — Agenten-Start läuft über Claude Code Subagent-Dispatch
+
+**Hinweis: Agenten-Start-Mechanismus**
+Aegis Core startet Agenten nicht via Bash-Befehl. Er dispatcht Subagenten durch den Claude Code Subagent-Mechanismus (Task Envelope übergeben → Subagent startet mit Envelope als Kontext). Kein Prozess-Management nötig.
 
 **Manifest-Header (Beispiel):**
 ```
 AGENT: Aegis Core
 ROLLE: Orchestrator
-DARF: lesen, Tasks anlegen, Agenten steuern
-DARF NICHT: Projektcode schreiben, globale Settings ändern
+DARF: lesen, Tasks anlegen, Subagenten dispatchen
+DARF NICHT: Projektcode schreiben, globale Settings ändern, Bash direkt
 BEI UNKLARHEIT: Memory Agent befragen
 ```
 
@@ -103,9 +107,15 @@ BEI UNKLARHEIT: Memory Agent befragen
 [ ] Bestätigung → /clear darf starten
 ```
 
+**Schreibbereiche im `langzeitgedaechnis/`:**
+- `local/` — Projektgedächtnis, History, Entscheidungen (Memory Agent)
+- `tasks/` — Task-Archive, aktive Envelopes (Memory Agent)
+- `findings/` — Review- und Security-Findings (Argus + Nexus, NICHT Memory Agent)
+
 **Darf nicht:**
 - Direkt Source Code ändern
 - Außerhalb von `langzeitgedaechnis/` schreiben
+- In `findings/` schreiben — das ist Argus/Nexus-Domäne
 
 ---
 
@@ -144,17 +154,21 @@ HILFE: [Aegis Core] [Nexus-Projekt] [Argus nach Abschluss]
 **Datei:** `pjc3/.claude/agents/argus-sentinel.md`
 
 **Aufgabe:**
-- Review nach jedem Forge-Abschluss (PostToolUse-Hook triggert automatisch)
+- Review nach jedem Forge-Abschluss
 - Architekturprüfung, Stilprüfung, Übergabeprüfung, Diff-Analyse
+
+**Trigger-Mechanismus:**
+PostToolUse-Hook erkennt Forge-Abschluss → benachrichtigt Aegis Core → Aegis Core dispatcht Argus als Subagenten. Argus ist kein direkter Hook-Handler sondern wird von Aegis Core gerufen. Hook → Aegis Core → Argus.
 
 **Darf:**
 - Lesen (alle Repos)
 - Review-Berichte schreiben
-- Findings → Memory Agent (automatisch)
+- Findings direkt in `langzeitgedaechnis/findings/` schreiben (eigener Schreibbereich, nicht über Memory Agent)
 
 **Darf nicht:**
 - Produktionscode ändern
 - Tasks anlegen oder Agenten steuern
+- In `langzeitgedaechnis/local/` oder `tasks/` schreiben (nur Memory Agent)
 
 ---
 
@@ -164,10 +178,13 @@ HILFE: [Aegis Core] [Nexus-Projekt] [Argus nach Abschluss]
 **Datei:** `pjc3/.claude/agents/nexus-global.md`
 
 **Aufgabe:**
-- Systemweite Sicherheitsprüfungen
-- Trigger: bei Änderungen an `~/.claude/` oder `pjc3/` Kernbereich
+- Systemweite Sicherheitsprüfungen: `~/.claude/`, `pjc3/`, globale Hooks, Settings
+- Trigger: bei Änderungen an globalem Bereich
+- Security-Finding → `langzeitgedaechnis/findings/` (sofort)
 
-**Darf nicht:** Code ändern, außerhalb globaler Scope lesen
+**Lese-Scope:** `~/.claude/`, `pjc3/` vollständig + Satellit-Repos read-only (Security-Checks erfordern Einblick in alle Repos — bewusste Ausnahme, nur lesen)
+
+**Darf nicht:** Code ändern, in Satellit-Repos schreiben, Settings ändern
 
 ---
 
@@ -177,11 +194,11 @@ HILFE: [Aegis Core] [Nexus-Projekt] [Argus nach Abschluss]
 **Datei:** je Satellit z.B. `pjc3-docker/.claude/agents/nexus-projekt.md`
 
 **Aufgabe:**
-- Projektspezifische Sicherheitsprüfungen
+- Projektspezifische Sicherheitsprüfungen innerhalb ROOT
 - Parallel zu Forge oder auf Anfrage von Aegis Core
-- Security-Finding → Memory Agent (sofort, nicht warten auf /clear)
+- Security-Finding → `langzeitgedaechnis/findings/` (sofort, nicht warten auf /clear)
 
-**Vollständige Isolation:** darf nicht außerhalb seines Repos arbeiten
+**Vollständige Isolation:** darf nicht außerhalb ROOT lesen oder schreiben
 
 ---
 
@@ -201,6 +218,11 @@ TASK-ENVELOPE
   Offen:     nein / ja → Aegis Core fragen
 ```
 
+**Speicherort:**
+- Aktiv während Ausführung: `langzeitgedaechnis/tasks/active/task-YYYY-MM-DD-NNN.md`
+- Nach Abschluss archiviert: `langzeitgedaechnis/tasks/archive/`
+- Envelope-Datei als offener Punkt markiert (Format YAML vs. Markdown-Header noch offen)
+
 Agent liest **nur seinen Envelope** — kein globaler Kontext, kein Suchen.
 
 ---
@@ -216,17 +238,21 @@ Agent-User (UID 1001–1003) haben physisch keine Schreibrechte außerhalb ihres
 Kernel blockiert — unabhängig vom Hook.
 
 ### Schicht 3 — Kernel: AppArmor Profile
-Ein AppArmor-Profil pro Agent-Typ:
-```
-# forge-pjc3-docker
-/home/ubhp-nova/claude-c/pjc3-docker/**  rw
-/home/ubhp-nova/claude-c/pjc3/**         r
-/home/ubhp-nova/.claude/**               ---  (verboten)
-deny /home/ubhp-nova/claude-c/pjc3/** w
-```
-Sitzt im Linux-Kernel — kein Prozess kommt daran vorbei.
+Ein AppArmor-Profil pro Agent-Typ. Sitzt im Linux-Kernel — kein Prozess kommt daran vorbei.
 
-### Schicht 4 — Container: Docker
+**Konzeptuelles Beispiel** (vereinfacht — kein Copy-Paste, echte Syntax in eigener Implementierungs-Spec):
+```
+# Profil: forge-pjc3-docker (konzeptuell)
+allow /home/ubhp-nova/claude-c/pjc3-docker/**  rw
+allow /home/ubhp-nova/claude-c/pjc3/**          r
+deny  /home/ubhp-nova/.claude/**                (kein Zugriff)
+deny  /home/ubhp-nova/claude-c/pjc3/**          w  (lesen ja, schreiben nein)
+```
+Enforcement durch AppArmor — unabhängig von Hooks oder Agent-Verhalten.
+
+### Schicht 4 — Container: Docker (zusätzliche Härtung)
+
+**Anwendbarkeit:** Docker ist zusätzliche Härtung wenn Forge-Arbeit containerisiert läuft. Nicht-containerisierte Claude Code Subagenten verlassen sich auf Schichten 1–3. Docker erhöht die Sicherheit, ist aber kein Ersatz für Schicht 2+3.
 ```yaml
 user: "1001:1001"
 read_only: true
@@ -240,7 +266,7 @@ volumes:
 ```
 
 ### Schicht 5 — Audit: Argus Sentinel
-Findet Verstöße, schreibt Finding → Memory Agent → Aegis Core stoppt Agent.
+Findet Verstöße, schreibt Finding direkt → `langzeitgedaechnis/findings/` → Aegis Core liest Findings und stoppt Agent bei Bedarf.
 
 **Übersicht:**
 ```
@@ -263,8 +289,8 @@ Unbemerkte Änderung       │ Schicht 5 (Audit-Log)
 | Memory Agent | alle | nur Local | nein | ja (context7, Vault) |
 | Forge | ROOT | ROOT | ja (in ROOT) | nein |
 | Argus Sentinel | alle | nur Findings | nein | nein |
-| Nexus Global | global | nein | read-only | nein |
-| Nexus Projekt | ROOT | nein | read-only | nein |
+| Nexus Global | global + Satelliten (r) | nur findings/ | read-only: ls,cat,find,grep | nein |
+| Nexus Projekt | ROOT | nur findings/ | read-only: ls,cat,find,grep | nein |
 
 ---
 
@@ -276,7 +302,8 @@ Unbemerkte Änderung       │ Schicht 5 (Audit-Log)
 Stufe 1 — Fundament (Defense in Depth)
   → AppArmor-Profile anlegen (je Agent-Typ)
   → POSIX-Rechte setzen (setup-agent-isolation.sh erweitern)
-  → Verifikation: kann Forge-User in pjc3/ schreiben? → Nein ✓
+  → Verifikation: Admin prüft manuell — kann Forge-User in pjc3/ schreiben? → Nein ✓
+    (Ergebnis wird in Stufe 2 vom Memory Agent archiviert, nicht hier)
 
 Stufe 2 — Memory Agent
   → Ordnerstruktur: langzeitgedaechnis/ mit Local / Vault-Platzhalter
@@ -301,7 +328,7 @@ Stufe 5 — Forge/pjc3-docker (erster Builder)
 
 Stufe 6 — Argus Sentinel
   → Erst wenn Forge operativ (braucht etwas zum prüfen)
-  → Verifikation: Finding landet im Memory Agent ✓
+  → Verifikation: Finding landet in langzeitgedaechnis/findings/ ✓
 
 Stufe 7 — Nexus Projekt
   → Security-Layer je Satellit
@@ -318,10 +345,13 @@ Stufe 8 — Nexus Global
 
 ```
 [ ] Task Envelope — genaues Dateiformat (YAML? Markdown-Header?)
-[ ] Notification-Trigger — Favorit: vor /clear; exakter Mechanismus offen
+[ ] SessionEnd-Trigger (Memory Agent Checkliste) — Favorit: vor /clear; exakter Hook-Mechanismus offen
+[ ] PostToolUse-Trigger (Argus-Start nach Forge) — Hook → Aegis Core → Argus Dispatch; exakte Hook-Konfiguration offen
 [ ] Vault — Technologie noch nicht festgelegt (Vaultwarden-Integration?)
 [ ] Sub-Agenten unter Aegis Core — wann, wie viele?
-[ ] NOVA_ROADMAP.md — Klarstellungs-Vermerk am Session-Ende eintragen
+[ ] NOVA_ROADMAP.md — Klarstellungs-Vermerk: Datei ist universelle Vision/Blaupause,
+    Begriffe wie "Aegis Core" sind generisch (kein Eigenname), Namen pro Projekt frei wählbar.
+    Einmalig am Session-Ende eintragen.
 ```
 
 ---
