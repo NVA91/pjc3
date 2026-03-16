@@ -8,8 +8,9 @@
 
 | Prio | Plan | Nächster Schritt |
 |------|------|-----------------|
-| 1 | `docs/superpowers/plans/2026-03-15-pyramid-core-migration.md` | **Nächste Session: Design-Spec schreiben** → Checkpoint 0→1 → Phase 1 |
-| 2 | `../pjc3-docker/docs/superpowers/plans/2026-03-14-stack-inbetriebnahme.md` | LAN_IP eintragen → Pre-Flight |
+| 1 | `docs/superpowers/plans/2026-03-16-migration-agenten-implementierung.md` | **Nächste Session: Chunk 1 — System-Fundament** (Task 1: POSIX-User, Task 2: AppArmor, Task 3: Ordner) |
+| 2 | `docs/superpowers/plans/2026-03-15-pyramid-core-migration.md` | Checkpoint 0→1 → Phase 1 (nach Agenten-Plan) |
+| 3 | `../pjc3-docker/docs/superpowers/plans/2026-03-14-stack-inbetriebnahme.md` | LAN_IP eintragen → Pre-Flight |
 
 **Fortsetzen:** `/weiter`
 
@@ -222,6 +223,8 @@ Pfad: `docs/superpowers/plans/YYYY-MM-DD-<thema>.md`
 - Datei: `statusline-command.sh` (in diesem Repo, versioniert)
 - Referenz: `~/.claude/settings.json` → `statusLine.command` mit absolutem Pfad
 - Kein Symlink — direkter Pfad: `bash /home/ubhp-nova/claude-c/pjc3/statusline-command.sh`
+- Format: `user@host dir git:(branch) [Modell ctx:XX%]` — robbyrussell-Stil
+- **Konfiguration vollständig** — `/statusline` bestätigt, keine Änderung erforderlich
 
 ---
 
